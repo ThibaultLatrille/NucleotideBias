@@ -5,17 +5,18 @@
 #   git config --global core.excludesfile '~/.gitignore_global'
 
 *~
-notebooks
 .idea/
 /SimuEvol
-manuscript.pdf
+/manuscript
+*.7z
+.ipynb_checkpoints/
 *.pyc
 *.aux
 *.log
 *.synctex.gz
 *.swp
-*.pdf
 *.p
+*.svg
 *.out
 *.nav
 *.snm
