@@ -1,6 +1,7 @@
 # GLOBAL IMPORTS
-from codons import *
+import argparse
 import matplotlib.pyplot as plt
+from hyphy_format import *
 
 
 def simpson_diversity(frequencies):
@@ -120,7 +121,19 @@ def generate_frequencies(beta_param, lambda_param, gBGC_param, propensities_seq)
            diversity_codon, diversity_mean_codon, diversity_aa, diversity_mean_aa
 
 
-def plot_summary_stats(lambda_axis, beta_axis, b_axis, protein, dimensions=list([1])):
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-d', '--directory', required=False, type=str,
+                        default='/home/thibault/NucleotideBias/scripts',
+                        dest="d", metavar="<dir_raw_batch>",
+                        help="The path to the directory containing the raw batch (projected_mut_sel.bf)")
+    args = parser.parse_args()
+    lambda_axis = np.logspace(np.log10(0.1), np.log10(10), 3)
+    beta_axis = np.logspace(np.log10(0.1), np.log10(10), 30)
+    b_axis = [0]
+    protein = "np"
+    dimensions = [1]
+
     params_axis_list = [lambda_axis, beta_axis, b_axis]
     params_axis_len_list = [len(x) for x in params_axis_list]
     labels = ["\\lambda", "N_{e}", "B"]
@@ -163,6 +176,7 @@ def plot_summary_stats(lambda_axis, beta_axis, b_axis, protein, dimensions=list(
 
     if protein in ['gal4', 'lactamase', 'np', 'ha']:
         import os
+
         preferences_list = []
 
         file_path = '../data_prefs/{0}.txt'.format(protein)
@@ -212,6 +226,7 @@ def plot_summary_stats(lambda_axis, beta_axis, b_axis, protein, dimensions=list(
             elif 2 == dimension:
                 zoom = 3
                 import scipy.ndimage
+
                 zommed_x_axis = np.logspace(np.log10(np.min(x_axis)), np.log10(np.max(x_axis)), len(x_axis) * zoom)
                 zommed_y_axis = np.logspace(np.log10(np.min(y_axis)), np.log10(np.max(y_axis)), len(y_axis) * zoom)
                 x_mesh, y_mesh = np.meshgrid(zommed_x_axis, zommed_y_axis)
@@ -240,9 +255,3 @@ def plot_summary_stats(lambda_axis, beta_axis, b_axis, protein, dimensions=list(
             plt.savefig("../figures/{0}_{1}d.png".format(stat_axis[stat_index], dimension), format="png")
             plt.clf()
             plt.close('all')
-
-
-lambda_axis = np.logspace(np.log10(0.1), np.log10(10), 3)
-beta_axis = np.logspace(np.log10(0.1), np.log10(10), 30)
-b_axis = [0]
-plot_summary_stats(lambda_axis, beta_axis, b_axis, protein="np", dimensions=[1])

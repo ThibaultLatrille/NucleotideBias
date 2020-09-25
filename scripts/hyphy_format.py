@@ -1,4 +1,10 @@
 # GLOBAL IMPORTS
+import os
+import matplotlib.pyplot as plt
+from matplotlib import markers
+
+markers_array = list(markers.MarkerStyle.markers.keys())
+
 from codons import *
 
 

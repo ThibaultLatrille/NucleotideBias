@@ -12,7 +12,7 @@ First, we find the F61, F1x4, F3x4 frequencies. We use the global alignment freq
 Second, we set up the hyphy batch file which makes use of these frequencies.
 Third, we generate the MG1 and MG3 matrix files.
 '''
-from analysis import codon_table, codons, nucindex
+from codons import codon_table, codons, nucindex
 import jinja2
 import argparse
 from ete3 import Tree
@@ -210,19 +210,19 @@ def build_hyphy_batchfile(raw_batch_path, batch_outfile, fasta_infile, tree_infi
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-d', '--directory', required=False, type=str,
-                        default='/home/thibault/SimuEvol/scripts',
+                        default='/home/thibault/NucleotideBias/scripts',
                         dest="d", metavar="<dir_raw_batch>",
                         help="The path to the directory containing the raw batch (projected_mut_sel.bf)")
     parser.add_argument('-b', '--batch', required=False, type=str,
-                        default='/home/thibault/SimuEvol/data_hyphy/npcst.bf',
+                        default='/home/thibault/NucleotideBias/scripts/npcst.bf',
                         dest="b", metavar="<batch_output_path.bf>",
                         help="The path to the output batch.")
     parser.add_argument('-f', '--fasta', required=False, type=str,
-                        default="/home/thibault/SimuEvol/data_alignment/npcst.fasta",
+                        default="/home/thibault/NucleotideBias/data/NP/hyphy_analysis/alignment.fasta",
                         dest="f", metavar="<.fasta>",
                         help="The path to fasta alignment file")
     parser.add_argument('-t', '--tree', required=False, type=str,
-                        default="/home/thibault/SimuEvol/data_trees/np.newick",
+                        default="/home/thibault/NucleotideBias/data/NP/hyphy_analysis/tree.newick",
                         dest="t", metavar="<.newick>",
                         help="The path to the newick tree file")
     parser.add_argument('-p', '--parameters', required=False, type=str,

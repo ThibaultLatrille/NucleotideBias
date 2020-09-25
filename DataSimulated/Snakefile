@@ -1,0 +1,95 @@
+import os
+ROOT = os.path.abspath('..')
+import numpy as np
+import sys
+sys.path.append(ROOT)
+from scripts.snakemake_module import *
+
+EXPERIMENT = os.path.abspath('.')
+
+lambda_array = np.logspace(-1, 1, nbr_points)
+alpha_array = np.logspace(-1, 1, nbr_points)
+
+#Parameters for the simulation
+SIMULATION_PARAMS = '--preferences={prefs_path} --newick={newick_path} --output={ali_path} --mu={mu} --lambda={mut_bias} --tied=false'
+
+for program in ['bayescode', 'SimuEvol']:
+    diff_git_dir("{0}/{1}".format(ROOT, program), "{0}/{1}".format(EXPERIMENT, program))
+
+localrules: all, all_profiles, all_traces, all_trees, make_bayescode, bayescode_model, draw_fossils, make_simuevol,
+          plot_profiles, plot_simulation, plot_traces, plot_trees, read_profiles, read_trees
+
+print(INFERENCE_MODELS)
+
+rule all:
+    input:
+         EXPERIMENT + '/figures_simulations',
+         EXPERIMENT + '/figures_inference'
+
+rule make_simuevol:
+    output:
+          EXPERIMENT + '/SimuDiv',
+    input: dir=EXPERIMENT + '/SimuEvol.version'
+    shell: 'cd {ROOT}/SimuEvol {params.compile} && cp build/SimuDiv {EXPERIMENT}'
+
+rule run_simulation:
+    output: touch(EXPERIMENT + '/{simumode}_exp')
+    input:
+         exec=EXPERIMENT + '/{simumode}',
+         config_core=EXPERIMENT + '/config.SIMULATION',
+         config_pan=EXPERIMENT + '/config.' + '{simumode}',
+         prefs=PREFERENCES
+    params:
+          time="3-23:00", mem=300, threads=1,
+          pan=lambda wildcards: SIMULATION_SIMUMODE_PARAM[wildcards.simumode]
+    benchmark: EXPERIMENT + "/benchmarks.simulation.{simumode}.tsv"
+    log: out=EXPERIMENT + '/std.{simumode}_exp.stdout', err=EXPERIMENT + '/std.{simumode}_exp.stderr'
+    shell: '{input.exec} {SIMULATION_PARAMS} {params.pan} --output {output} 2> {log.err} 1> {log.out}'
+
+rule plot_simulations:
+    output: plot=directory(EXPERIMENT + '/simulation_{simumode}_plot')
+    input:
+         src=ROOT + "/scripts/plot_simulation.py",
+         simu=rules.run_simulation.output
+    shell: 'mkdir -p {output.plot} && python3 {input.src} --tree {input.simu}.nhx --output {output.plot}'
+
+
+rule run_inference:
+    output: touch(EXPERIMENT + '/{simumode}_{model}_{polymorphism}_{chain}_run')
+    input:
+         exec=rules.bayescode_model.output.model,
+         simu=rules.run_simulation.output,
+         fossils=rules.draw_fossils.output,
+         traits=rules.draw_traits.output,
+         config=EXPERIMENT + '/config.INFERENCE'
+    params:
+          time="18-00:00", mem=1500, threads=1,
+          ali=lambda w: ' -a {input.simu}.ali ' if ("nodetraits" != w.model) else ' --df {0} '.format(config['INFERENCE_NODE']['DOF']) ,
+          mutsel=lambda w: MUTSEL_PARAMS if ("aa" == w.model or "node" == w.model) else "",
+          poly=lambda wildcards: " -p" if wildcards.polymorphism.lower() == 'true' else "",
+          node=lambda wildcards: INFERENCE_NODE_PARAMS if wildcards.model == "node" else "",
+          traits=lambda wildcards, input: " --traitsfile {0}".format(input.traits) if (
+                  "node" in wildcards.model and config['INFERENCE_NODE']['TRAITS']) else "",
+          fossils=lambda wildcards, input: " --fossils {0}".format(input.fossils) if (
+                  "node" in wildcards.model and config['INFERENCE_NODE']['FOSSILS'] > 0) else ""
+    benchmark: EXPERIMENT + "/benchmarks.inference.{simumode}_{model}_{polymorphism}_{chain}_run.tsv"
+    log:
+         out=EXPERIMENT + '/std.{simumode}_{model}_{polymorphism}_{chain}_run.stdout',
+         err=EXPERIMENT + '/std.{simumode}_{model}_{polymorphism}_{chain}_run.stderr'
+    shell: '{input.exec} {INFERENCE_PARAMS}{params.ali}{params.poly}{params.mutsel}{params.node}{params.traits}{params.fossils} {output} 2> {log.err} 1> {log.out}'
+
+rule plot_correlation_matrix:
+    output: plot=touch(CORRELATION + '/{simumode}_{model}_{polymorphism}_{chain}')
+    input:
+         src=ROOT + "/scripts/plot_correlation_matrix.py",
+         trace=EXPERIMENT + '/{simumode}_{model}_{polymorphism}_{chain}_run',
+         config=EXPERIMENT + '/config.PLOT'
+    shell:
+         'python3 {input.src} --trace {input.trace} --output {output.plot} --burn_in {PLOT_BURN_IN}'
+
+
+rule all_correlation_matrix:
+    output: plot=touch(EXPERIMENT + '/all_correlation_matrix')
+    input:
+         trace=expand(CORRELATION + '/{simumode}_{model}_{polymorphism}_{chain}', simumode=INFERENCE_SIMULATORS, chain=INFERENCE_CHAINS, polymorphism=INFERENCE_POLYMORPHISM, model=[i for i in INFERENCE_MODELS if "node" in i])
+

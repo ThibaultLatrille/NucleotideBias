@@ -1,5 +1,5 @@
 # GLOBAL IMPORTS
-from analysis import *
+from hyphy_format import *
 import matplotlib.pyplot as plt
 import os
 
