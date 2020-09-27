@@ -1,121 +1,46 @@
 import os
-ROOT = os.path.abspath('../')
+ROOT = os.path.abspath('..')
 import numpy as np
 import sys
 sys.path.append(ROOT)
+BATCH_PATH = "{0}/scripts/hyphy_template.bf".format(ROOT)
 from scripts.snakemake_module import *
 
 EXPERIMENT = os.path.abspath('.')
-
-lambda_array = np.logspace(-1, 1, nbr_points)
-alpha_array = np.logspace(-1, 1, nbr_points)
+experiment_array = [i for i in os.listdir(os.path.abspath('.')) if (os.path.isdir(i) and os.path.isfile(i + "/tree.newick"))]
+print(experiment_array)
+models = ["MG", "MF"]
 
 rule all:
-    input:
-         EXPERIMENT + '/all_profiles',
-         EXPERIMENT + '/inference_traces',
-         EXPERIMENT + '/all_correlation_matrix',
-         expand(EXPERIMENT + '/inference_{model}_trees', model=[i for i in INFERENCE_MODELS if "node" in i])
-
-rule generate_profile:
-    output:
-          model=EXPERIMENT + '/{model}mutsel',
-          read=EXPERIMENT + '/read{model}mutsel'
-    input: dir=EXPERIMENT + '/bayescode.version'
-    shell:
-         'cd {ROOT}/bayescode && cp _build/{wildcards.model}mutsel {EXPERIMENT} && cp _build/read{wildcards.model}mutsel {EXPERIMENT}'
+    input: EXPERIMENT + '/merged_results.tsv'
 
 rule run_inference:
-    output: touch(EXPERIMENT + '/{model}_{polymorphism}_{chain}_run')
+    output: EXPERIMENT + '/{experiment}/{model}_run.bf'
     input:
-         exec=EXPERIMENT + '/{model}mutsel',
-         config=EXPERIMENT + '/config.INFERENCE'
+         exec=ROOT + "/scripts/hyphy_run.py"
     params:
-          time="18-0:00", mem=1500, threads=1,
-          mutsel=lambda w: MUTSEL_PARAMS if ("aa" == w.model or "node" == w.model) else "",
-          poly=lambda w: " -p" if w.polymorphism.lower() == 'true' else "",
-          node=lambda wildcards: INFERENCE_NODE_PARAMS if wildcards.model == "node" else "",
-          traits=lambda w: ' --traitsfile {0}/life_history_traits.tsv'.format(EXPERIMENT) if ("node" in w.model) and os.path.isfile(EXPERIMENT + "/life_history_traits.tsv") else "",
-          calibs=lambda w: ' --fossils {0}/calibs.tsv'.format(EXPERIMENT) if ("node" in w.model) and os.path.isfile(EXPERIMENT + "/calibs.tsv") else "",
-    benchmark: EXPERIMENT + "/benchmarks.inference.{model}_{polymorphism}_{chain}_run.tsv"
-    log: out=EXPERIMENT + '/{model}_{polymorphism}_{chain}_run.stdout', err=EXPERIMENT + '/{model}_{polymorphism}_{chain}_run.stderr'
-    shell: '{input.exec} -a {EXPERIMENT}/CDS.ali -t {EXPERIMENT}/rootedtree.nhx {INFERENCE_PARAMS}{params.poly}{params.mutsel}{params.traits}{params.calibs} {output} 2> {log.err} 1> {log.out}'
+          model=lambda w: "--model {0}".format(w.model),
+          tree=lambda w: "--tree {0}/{1}/tree.newick".format(EXPERIMENT, w.experiment),
+          fasta=lambda w: "--fasta {0}/{1}/alignment.fasta".format(EXPERIMENT, w.experiment)
+    benchmark: EXPERIMENT + "{experiment}/{model}.benchmark.tsv"
+    log:
+         out=EXPERIMENT + '/{experiment}/{model}.stdout',
+         err=EXPERIMENT + '/{experiment}/{model}.stderr'
+    shell: 'python3 {input.exec} --input {BATCH_PATH} {params.model} {params.fasta} {params.tree} --output {output} 2> {log.err} 1> {log.out}'
 
-rule inference:
-    input: expand(EXPERIMENT + '/{model}_{polymorphism}_{chain}_run', chain=INFERENCE_CHAINS, polymorphism=INFERENCE_POLYMORPHISM, model=INFERENCE_MODELS)
-
-rule read_traces:
-    output: EXPERIMENT + '/{model}_{polymorphism}_{chain}_run.trace.tsv'
+rule result_inference:
+    output: EXPERIMENT + '/{experiment}/results.tsv'
     input:
-         trace=rules.run_inference.output,
-         exec=rules.bayescode_model.output.read,
-         param_plot=EXPERIMENT + '/config.PLOT'
-    shell: '{input.exec} --burnin {PLOT_BURN_IN} --trace {input.trace} || true'
-
-rule plot_traces:
-    output: plot=directory(EXPERIMENT + '/inference_traces')
-    input:
-         src=ROOT + "/scripts/plot_traces.py",
-         trace=expand(EXPERIMENT + '/{model}_{polymorphism}_{chain}_run.trace.tsv', chain=INFERENCE_CHAINS, polymorphism=INFERENCE_POLYMORPHISM, model=INFERENCE_MODELS),
-         config=EXPERIMENT + '/config.PLOT'
+         src=ROOT + "/scripts/hyphy_empirical.py",
+         infer=expand(EXPERIMENT + '/{{experiment}}/{model}_run.bf', model=models)
     shell:
-         'mkdir -p {output.plot} && python3 {input.src} --trace {input.trace} --output {output.plot}'
+         'python3 {input.src} --input {input.infer} --output {output}'
 
-rule all_traces:
-    input: EXPERIMENT + '/inference_traces'
-
-
-rule plot_correlation_matrix:
-    output: plot=touch(CORRELATION + '/{model}_{polymorphism}_{chain}')
+rule merge_results:
+    output: EXPERIMENT + '/merged_results.tsv'
     input:
-         src=ROOT + "/scripts/plot_correlation_matrix.py",
-         trace=EXPERIMENT + '/{model}_{polymorphism}_{chain}_run',
-         config=EXPERIMENT + '/config.PLOT'
+        src=ROOT + "/scripts/merge_tsv.py",
+        results=expand(EXPERIMENT + '/{experiment}/results.tsv', experiment=experiment_array)
     shell:
-         'python3 {input.src} --trace {input.trace} --output {output.plot} --burn_in {PLOT_BURN_IN}'
+        'python3 {input.src} --input {input.results} --output {output}'
 
-
-rule all_correlation_matrix:
-    output: plot=touch(EXPERIMENT + '/all_correlation_matrix')
-    input:
-         trace=expand(CORRELATION + '/{model}_{polymorphism}_{chain}', chain=INFERENCE_CHAINS, polymorphism=INFERENCE_POLYMORPHISM, model=[i for i in INFERENCE_MODELS if "node" in i])
-
-rule read_profiles:
-    output: EXPERIMENT + '/{model}_{polymorphism}_{chain}_read.siteprofiles'
-    input:
-         trace=rules.run_inference.output,
-         exec=rules.bayescode_model.output.read,
-         param_plot=EXPERIMENT + '/config.PLOT'
-    shell: '{input.exec} --burnin {PLOT_BURN_IN} -s --profiles {output} {input.trace}'
-
-rule plot_profiles:
-    output: prefs=directory(EXPERIMENT + '/inference_{model}_profiles')
-    input:
-         src=ROOT + "/scripts/plot_profiles.py",
-         profiles=expand(EXPERIMENT + '/{{model}}_{polymorphism}_{chain}_read.siteprofiles', chain=INFERENCE_CHAINS, polymorphism=INFERENCE_POLYMORPHISM)
-    shell:
-         'mkdir -p {output.prefs} && python3 {input.src} --infer {input.profiles} --output {output.prefs}'
-
-rule all_profiles:
-    output: touch(EXPERIMENT + '/all_profiles')
-    input:
-         expand(EXPERIMENT + '/inference_{model}_profiles', model=[i for i in INFERENCE_MODELS if ("aa" == i or "node" == i)])
-
-rule read_trees:
-    output: touch(EXPERIMENT + '/{model}_{polymorphism}_{chain}_read')
-    input:
-         trace=rules.run_inference.output,
-         exec=rules.bayescode_model.output.read,
-         param_plot=EXPERIMENT + '/config.PLOT'
-    shell: '{input.exec} --burnin {PLOT_BURN_IN} --newick {input.trace} || true'
-
-rule plot_trees:
-    output: plot=directory(EXPERIMENT + '/inference_{model}_trees')
-    input:
-         src=ROOT + "/scripts/plot_trees.py",
-         trace=expand(EXPERIMENT + '/{{model}}_{polymorphism}_{chain}_run', chain=INFERENCE_CHAINS, polymorphism=INFERENCE_POLYMORPHISM),
-         read=expand(EXPERIMENT + '/{{model}}_{polymorphism}_{chain}_read', chain=INFERENCE_CHAINS, polymorphism=INFERENCE_POLYMORPHISM),
-    params:
-          tsv=lambda w: ' --tree {0}/rootedtree.nhx --tsv {0}/known_population_size.tsv'.format(EXPERIMENT) if os.path.isfile(EXPERIMENT + "/known_population_size.tsv") and os.path.isfile(EXPERIMENT + "/rootedtree.nhx") else "",
-    shell:
-         'mkdir -p {output.plot} && python3 {input.src}{params.tsv} --trace {input.trace} --output {output.plot}'

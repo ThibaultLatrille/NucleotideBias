@@ -3,93 +3,115 @@ ROOT = os.path.abspath('..')
 import numpy as np
 import sys
 sys.path.append(ROOT)
+BATCH_PATH = "{0}/scripts/hyphy_template.bf".format(ROOT)
 from scripts.snakemake_module import *
 
-EXPERIMENT = os.path.abspath('.')
+NBR_SITES = 1000
+MUT_RATE = 5.0
+EXPERIMENT = os.path.abspath('.') + "/n_{0}_mu{1}".format(NBR_SITES, MUT_RATE)
+print(EXPERIMENT)
+os.makedirs(EXPERIMENT, exist_ok=True)
+os.makedirs(EXPERIMENT + "/std", exist_ok=True)
+os.makedirs(EXPERIMENT + "/benchmarks", exist_ok=True)
 
-lambda_array = np.logspace(-1, 1, nbr_points)
-alpha_array = np.logspace(-1, 1, nbr_points)
+NEWICK = "np.newick"
+NEWICK_PATH = "{0}/{1}".format(EXPERIMENT, NEWICK)
+os.system('cp {0}/{1} {2}'.format(os.path.abspath('.'), NEWICK, NEWICK_PATH))
+
 
 #Parameters for the simulation
-SIMULATION_PARAMS = '--preferences={prefs_path} --newick={newick_path} --output={ali_path} --mu={mu} --lambda={mut_bias} --tied=false'
+SIMULATION_PARAMS = '--newick ' + NEWICK_PATH
+SIMULATION_PARAMS += ' --mutation_rate_per_generation {0}'.format(MUT_RATE)
+SIMULATION_PARAMS += ' --generation_time {0}'.format(1.0)
+SIMULATION_PARAMS += ' --seed {0}'.format(0)
+SIMULATION_PARAMS += ' --unused_root_age'
+SIMULATION_PARAMS += ' --branch_wise_correlation'
+SIMULATION_PARAMS += ' --fix_pop_size'
+SIMULATION_PARAMS += ' --fix_mut_rate'
+SIMULATION_PARAMS += ' --fix_gen_time'
 
-for program in ['bayescode', 'SimuEvol']:
+mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(-1, 1, 20)]
+alpha_array = ["{0:3f}".format(i) for i in np.logspace(-1, 1, 5)]
+for alpha in alpha_array:
+    os.makedirs(EXPERIMENT + "/" + alpha, exist_ok=True)
+models = ["MG", "MF"]
+
+for program in ['SimuEvol']:
     diff_git_dir("{0}/{1}".format(ROOT, program), "{0}/{1}".format(EXPERIMENT, program))
 
-localrules: all, all_profiles, all_traces, all_trees, make_bayescode, bayescode_model, draw_fossils, make_simuevol,
-          plot_profiles, plot_simulation, plot_traces, plot_trees, read_profiles, read_trees
-
-print(INFERENCE_MODELS)
 
 rule all:
     input:
-         EXPERIMENT + '/figures_simulations',
-         EXPERIMENT + '/figures_inference'
+         EXPERIMENT + '/plot_simulation',
+         # EXPERIMENT + '/plot_hyphy'
 
-rule make_simuevol:
-    output:
-          EXPERIMENT + '/SimuDiv',
+rule cp_simuevol:
+    output: EXPERIMENT + '/SimuProfile',
     input: dir=EXPERIMENT + '/SimuEvol.version'
-    shell: 'cd {ROOT}/SimuEvol {params.compile} && cp build/SimuDiv {EXPERIMENT}'
+    shell: 'cd {ROOT}/SimuEvol && cp build/SimuProfile {EXPERIMENT}'
+
+rule generate_profile:
+    output: EXPERIMENT + '/{alpha}_profile.prefs'
+    input:
+         exec=ROOT + "/scripts/generate_profile.py"
+    params:
+          alpha=lambda w: "--alpha {0}".format(w.alpha)
+    shell: 'python3 {input.exec} {params.alpha} --nbr_sites {NBR_SITES} --output {output}'
+
+rule generate_matrix:
+    output: EXPERIMENT + '/{mut_bias}_matrix.tsv'
+    input:
+         exec=ROOT + "/scripts/generate_matrix.py"
+    params:
+          mut_bias=lambda w: "--lambda {0}".format(w.mut_bias)
+    shell: 'python3 {input.exec} {params.mut_bias} --output {output}'
+
 
 rule run_simulation:
-    output: touch(EXPERIMENT + '/{simumode}_exp')
+    output: touch(EXPERIMENT + '/{alpha}/{mut_bias}_exp')
     input:
-         exec=EXPERIMENT + '/{simumode}',
-         config_core=EXPERIMENT + '/config.SIMULATION',
-         config_pan=EXPERIMENT + '/config.' + '{simumode}',
-         prefs=PREFERENCES
-    params:
-          time="3-23:00", mem=300, threads=1,
-          pan=lambda wildcards: SIMULATION_SIMUMODE_PARAM[wildcards.simumode]
-    benchmark: EXPERIMENT + "/benchmarks.simulation.{simumode}.tsv"
-    log: out=EXPERIMENT + '/std.{simumode}_exp.stdout', err=EXPERIMENT + '/std.{simumode}_exp.stderr'
-    shell: '{input.exec} {SIMULATION_PARAMS} {params.pan} --output {output} 2> {log.err} 1> {log.out}'
+         exec=rules.cp_simuevol.output,
+         prefs=rules.generate_profile.output,
+         matrix=rules.generate_matrix.output
+    benchmark: EXPERIMENT + "/benchmarks/exp_{alpha}_{mut_bias}.tsv"
+    log:
+        out=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}.stdout',
+        err=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}.stderr'
+    shell: '{input.exec} {SIMULATION_PARAMS}  --nuc_matrix {input.matrix} --preferences {input.prefs} --output {output} 2> {log.err} 1> {log.out}'
 
 rule plot_simulations:
-    output: plot=directory(EXPERIMENT + '/simulation_{simumode}_plot')
+    output: directory(EXPERIMENT + '/plot_simulation')
     input:
-         src=ROOT + "/scripts/plot_simulation.py",
-         simu=rules.run_simulation.output
-    shell: 'mkdir -p {output.plot} && python3 {input.src} --tree {input.simu}.nhx --output {output.plot}'
-
+         src=ROOT + "/scripts/stat_simulated.py",
+         exp=expand(rules.run_simulation.output, alpha=alpha_array, mut_bias=mut_bias_array)
+    shell: 'mkdir -p {output} && python3 {input.src} --input {input.exp} --output {output}'
 
 rule run_inference:
-    output: touch(EXPERIMENT + '/{simumode}_{model}_{polymorphism}_{chain}_run')
+    output: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf'
     input:
-         exec=rules.bayescode_model.output.model,
-         simu=rules.run_simulation.output,
-         fossils=rules.draw_fossils.output,
-         traits=rules.draw_traits.output,
-         config=EXPERIMENT + '/config.INFERENCE'
+         exec=ROOT + "/scripts/hyphy_run.py",
+         exp=rules.run_simulation.output
     params:
-          time="18-00:00", mem=1500, threads=1,
-          ali=lambda w: ' -a {input.simu}.ali ' if ("nodetraits" != w.model) else ' --df {0} '.format(config['INFERENCE_NODE']['DOF']) ,
-          mutsel=lambda w: MUTSEL_PARAMS if ("aa" == w.model or "node" == w.model) else "",
-          poly=lambda wildcards: " -p" if wildcards.polymorphism.lower() == 'true' else "",
-          node=lambda wildcards: INFERENCE_NODE_PARAMS if wildcards.model == "node" else "",
-          traits=lambda wildcards, input: " --traitsfile {0}".format(input.traits) if (
-                  "node" in wildcards.model and config['INFERENCE_NODE']['TRAITS']) else "",
-          fossils=lambda wildcards, input: " --fossils {0}".format(input.fossils) if (
-                  "node" in wildcards.model and config['INFERENCE_NODE']['FOSSILS'] > 0) else ""
-    benchmark: EXPERIMENT + "/benchmarks.inference.{simumode}_{model}_{polymorphism}_{chain}_run.tsv"
+          model=lambda w: "--model {0}".format(w.model)
+    benchmark: EXPERIMENT + "/benchmarks/inference.{alpha}_{mut_bias}_{model}_run.tsv"
     log:
-         out=EXPERIMENT + '/std.{simumode}_{model}_{polymorphism}_{chain}_run.stdout',
-         err=EXPERIMENT + '/std.{simumode}_{model}_{polymorphism}_{chain}_run.stderr'
-    shell: '{input.exec} {INFERENCE_PARAMS}{params.ali}{params.poly}{params.mutsel}{params.node}{params.traits}{params.fossils} {output} 2> {log.err} 1> {log.out}'
+         out=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stdout',
+         err=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stderr'
+    shell: 'python3 {input.exec} --input {BATCH_PATH} --fasta {input.exp}.ali {params.model} --tree {NEWICK_PATH} --output {output} 2> {log.err} 1> {log.out}'
 
-rule plot_correlation_matrix:
-    output: plot=touch(CORRELATION + '/{simumode}_{model}_{polymorphism}_{chain}')
+rule merge_inference:
+    output: touch(EXPERIMENT + '/{model}_plot')
     input:
-         src=ROOT + "/scripts/plot_correlation_matrix.py",
-         trace=EXPERIMENT + '/{simumode}_{model}_{polymorphism}_{chain}_run',
-         config=EXPERIMENT + '/config.PLOT'
+         src=ROOT + "/scripts/hyphy_simulated.py",
+         infer=expand(EXPERIMENT + '/{alpha}/{mut_bias}_{{model}}_run.bf', alpha=[alpha_array[0]], mut_bias=mut_bias_array)
+    params:
+         model=lambda w: "--model {0}".format(w.model)
     shell:
-         'python3 {input.src} --trace {input.trace} --output {output.plot} --burn_in {PLOT_BURN_IN}'
+         'python3 {input.src} {params.model} --trace {input.infer} --output {output}'
 
 
-rule all_correlation_matrix:
-    output: plot=touch(EXPERIMENT + '/all_correlation_matrix')
-    input:
-         trace=expand(CORRELATION + '/{simumode}_{model}_{polymorphism}_{chain}', simumode=INFERENCE_SIMULATORS, chain=INFERENCE_CHAINS, polymorphism=INFERENCE_POLYMORPHISM, model=[i for i in INFERENCE_MODELS if "node" in i])
+rule hyphy_simulated:
+    output: plot=touch(EXPERIMENT + '/plot_hyphy')
+    input: expand(EXPERIMENT + '/{model}_plot', model=models)
+
 

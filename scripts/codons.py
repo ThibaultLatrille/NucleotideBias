@@ -3,7 +3,8 @@ import numpy as np
 from collections import defaultdict
 
 subset_list = ["WS", "WW", "SS", "SW"]
-codon_table = {
+codon_table = defaultdict(lambda: '-')
+codon_table.update({
     'ATA': 'I', 'ATC': 'I', 'ATT': 'I', 'ATG': 'M',
     'ACA': 'T', 'ACC': 'T', 'ACG': 'T', 'ACT': 'T',
     'AAC': 'N', 'AAT': 'N', 'AAA': 'K', 'AAG': 'K',
@@ -19,7 +20,7 @@ codon_table = {
     'TCA': 'S', 'TCC': 'S', 'TCG': 'S', 'TCT': 'S',
     'TTC': 'F', 'TTT': 'F', 'TTA': 'L', 'TTG': 'L',
     'TAC': 'Y', 'TAT': 'Y', 'TAA': 'X', 'TAG': 'X',
-    'TGC': 'C', 'TGT': 'C', 'TGA': 'X', 'TGG': 'W'}
+    'TGC': 'C', 'TGT': 'C', 'TGA': 'X', 'TGG': 'W'})
 
 nucleotides = "ACGT"
 weak_nucleotides = "AT"

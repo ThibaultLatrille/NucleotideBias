@@ -16,6 +16,16 @@ from codons import codon_table, codons, nucindex
 import jinja2
 import argparse
 from ete3 import Tree
+from subprocess import run
+
+def write_fasta_file(ali_path, fasta_path):
+    with open(ali_path, 'r') as ali_file:
+        next(ali_file)
+        with open(fasta_path, 'w') as fasta_file:
+            for line in ali_file:
+                if line == "\n": continue
+                name, seq = line.replace("  ", " ").split(" ")
+                fasta_file.write(">{0}\n{1}".format(name, seq))
 
 
 def get_nuc_diff(source, target, grab_position=False):
@@ -164,11 +174,10 @@ def build_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constrains_li
     return matrix, array_to_hyphy_freq(codon_freqs)
 
 
-def build_hyphy_batchfile(raw_batch_path, batch_outfile, fasta_infile, tree_infile,
+def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infile,
                           rate_param=0, freq_param=3, omega_param=1):
     # Parse input arguments and set up input/outfile files accordingly
     name = batch_outfile.split('/')[-1]
-    raw_batchfile = raw_batch_path + "/projected_mut_sel.bf"
 
     # Calculate frequency parameterizations
     print("Calculating frequency parametrization.")
@@ -209,26 +218,17 @@ def build_hyphy_batchfile(raw_batch_path, batch_outfile, fasta_infile, tree_infi
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-d', '--directory', required=False, type=str,
-                        default='/home/thibault/NucleotideBias/scripts',
-                        dest="d", metavar="<dir_raw_batch>",
-                        help="The path to the directory containing the raw batch (projected_mut_sel.bf)")
-    parser.add_argument('-b', '--batch', required=False, type=str,
-                        default='/home/thibault/NucleotideBias/scripts/npcst.bf',
-                        dest="b", metavar="<batch_output_path.bf>",
-                        help="The path to the output batch.")
-    parser.add_argument('-f', '--fasta', required=False, type=str,
-                        default="/home/thibault/NucleotideBias/data/NP/hyphy_analysis/alignment.fasta",
-                        dest="f", metavar="<.fasta>",
-                        help="The path to fasta alignment file")
-    parser.add_argument('-t', '--tree', required=False, type=str,
-                        default="/home/thibault/NucleotideBias/data/NP/hyphy_analysis/tree.newick",
-                        dest="t", metavar="<.newick>",
-                        help="The path to the newick tree file")
-    parser.add_argument('-p', '--parameters', required=False, type=str,
-                        default="0-3-1",
-                        dest="p", metavar="<parameters>",
-                        help="The parameters of the GTR-Matrix")
+    parser.add_argument('-o', '--output', required=True, type=str, dest="output", help="The path to output batch file")
+    parser.add_argument('-i', '--input', required=True, type=str, dest="input", help="The path to template batch file")
+    parser.add_argument('-f', '--fasta', required=True, type=str, dest="fasta", help="The path to fasta alignment file")
+    parser.add_argument('-t', '--tree', required=True, type=str, dest="tree", help="The path to the newick tree file")
+    parser.add_argument('-m', '--model', required=True, type=str, dest="model", help="The parameters of the GTR-Matrix")
     args = parser.parse_args()
-    params = [int(p) for p in args.p.split("-")]
-    build_hyphy_batchfile(args.d, args.b, args.f, args.t, params[0], params[1], params[2])
+    params_dico = {"MG": "0-3-1", "MF": "0-3-95"}
+    if args.fasta[-4:] == ".ali":
+        ali = args.fasta
+        args.fasta = args.fasta.replace(".ali", ".fasta")
+        write_fasta_file(ali, args.fasta)
+    params = [int(p) for p in params_dico[args.model].split("-")]
+    build_hyphy_batchfile(args.output, args.input, args.fasta, args.tree, params[0], params[1], params[2])
+    run("HYPHYMP {0} CPU={1}\n".format(args.output, 1), shell=True)

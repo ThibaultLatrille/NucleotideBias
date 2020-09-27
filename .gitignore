@@ -8,6 +8,10 @@
 .idea/
 /SimuEvol
 /manuscript
+/data
+/DataSimulated/n_*
+/DataEmpirical/*
+/*/.snakemake
 *.7z
 .ipynb_checkpoints/
 *.pyc
