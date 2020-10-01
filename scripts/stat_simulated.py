@@ -83,12 +83,16 @@ def y_label(p):
         return 'AT/GC'
     elif "diversity" in p:
         return "D"
+    elif "omega_WS_over_SW" in p:
+        return "$\\nu_{\\mathrm{AT} \\rightarrow \\mathrm{GC}} / \\nu_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
+    elif "omega_SW_over_WS" in p:
+        return "$\\nu_{\\mathrm{GC} \\rightarrow \\mathrm{AT}} / \\nu_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
     elif "omega_WS" in p:
-        return "$\\omega_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
+        return "$\\nu_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
     elif "omega_SW" in p:
-        return "$\\omega_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
+        return "$\\nu_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
     elif "omega" in p:
-        return "$\\omega$"
+        return "$\\nu$"
     else:
         return p
 
@@ -100,6 +104,8 @@ def title(p):
         return "Site-specific amino-acid diversity"
     elif "diversity_aa" in p:
         return "Sequence amino-acid diversity"
+    elif "omega_" in p and "over" in p:
+        return "Restricted to non-synonymous\nmutations between GC and AT"
     elif "omega_WS" in p:
         return "Restricted to non-synonymous\nmutations from AT to GC"
     elif "omega_SW" in p:
@@ -116,7 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input', required=True, type=str, nargs='+', dest="input")
     args = parser.parse_args()
 
-    dico_params = {"omega": {}, "omega_WS": {}, "omega_SW": {}}
+    dico_params = {"omega": {}, "omega_WS": {}, "omega_SW": {}, "omega_SW_over_WS": {}, "omega_WS_over_SW": {}}
     x_range, y_range = set(), set()
     for filepath in args.input:
         if not os.path.isfile(filepath): continue
@@ -131,6 +137,8 @@ if __name__ == '__main__':
         dico_params["omega"][(x, y)] = results_dico["dnd0_event_tot"]
         dico_params["omega_WS"][(x, y)] = results_dico["dnd0_WS_event_tot"]
         dico_params["omega_SW"][(x, y)] = results_dico["dnd0_SW_event_tot"]
+        dico_params["omega_SW_over_WS"][(x, y)] = results_dico["dnd0_SW_event_tot"] / results_dico["dnd0_WS_event_tot"]
+        dico_params["omega_WS_over_SW"][(x, y)] = results_dico["dnd0_WS_event_tot"] / results_dico["dnd0_SW_event_tot"]
 
     x_range, y_range = sorted(x_range), sorted(y_range)
     dico_params.pop("NbrSites")
@@ -143,16 +151,16 @@ if __name__ == '__main__':
         plt.xscale("log")
         plt.xlabel("$\\lambda$", size=font_size)
         plt.ylabel(y_label(param), size=font_size)
-        plt.title(title(param), size=font_size)
+        plt.title(title(param), size=font_size * 1.2)
         if "_aa" in param:
             plt.ylim((1, 20))
-        elif "omega" in param:
+        elif ("omega" in param) and ("over" not in param):
             plt.ylim((0, 1))
         elif "at_over_gc" in param:
             plt.yscale("log")
-        plt.legend(fontsize=font_size)
-        plt.xticks(fontsize=font_size)
-        plt.yticks(fontsize=font_size)
+        plt.legend(loc='upper left', fontsize=legend_size)
+        plt.xticks(fontsize=legend_size)
+        plt.yticks(fontsize=legend_size)
         plt.tight_layout()
         plt.savefig("{0}/{1}.pdf".format(args.output, param), format="pdf")
         plt.savefig("{0}/{1}.png".format(args.output, param), format="png")

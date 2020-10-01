@@ -22,7 +22,7 @@ rule run_inference:
           model=lambda w: "--model {0}".format(w.model),
           tree=lambda w: "--tree {0}/{1}/tree.newick".format(EXPERIMENT, w.experiment),
           fasta=lambda w: "--fasta {0}/{1}/alignment.fasta".format(EXPERIMENT, w.experiment)
-    benchmark: EXPERIMENT + "{experiment}/{model}.benchmark.tsv"
+    benchmark: EXPERIMENT + "/{experiment}/{model}.benchmark.tsv"
     log:
          out=EXPERIMENT + '/{experiment}/{model}.stdout',
          err=EXPERIMENT + '/{experiment}/{model}.stderr'

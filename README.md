@@ -8,7 +8,7 @@ The experiments are meant to run on Linux/Unix/MacOS operating systems.
 If problems and/or questions are encountered, feel free to [open issues](https://github.com/ThibaultLatrille/NucleotideBias/issues).
 
 ## 0. Local copy
-Clone the repository and cd to the dir.
+Clone the repository and `cd` to the dir.
 ```
 git clone https://github.com/ThibaultLatrille/NucleotideBias
 cd NucleotideBias
@@ -27,16 +27,31 @@ git clone https://github.com/ThibaultLatrille/SimuEvol && cd SimuEvol && make re
 ```
 Install python3 packages
 ```
-sudo apt install -qq -y python3-dev python3-pip screen
-pip3 install jupyterlab snakemake numpy matplotlib statsmodels seaborn pandas ete3 --user
+sudo apt install -qq -y python3-dev python3-pip
+pip3 install jupyterlab snakemake numpy matplotlib pandas ete3 --user
+```
+Install Hyphy from http://hyphy.org/installation/ using `miniconda`
+```
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+sh Miniconda3-latest-Linux-x86_64.sh
+conda config --add channels bioconda
+conda install -c bioconda hyphy
+```
+## 2. Run experiments
+
+### Installation on debian
+In both folder `DataEmpirical` and `DataSimulated`, run `snakemake`:
+```
+cd DataSimulated
+snakemake
 ```
 
-## 2. Add features or debug in the python scripts
+## 3. Add features or debug in the python scripts
 You made modifications to one of the python script, a notebook, this README.md, or you added new features.
 You wish this work benefits to all (futur) users of this repository?
 Please, feel free to open a [pull-request](https://github.com/ThibaultLatrille/NucleotideBias/pulls)
 
-## 3. Add features or debug in *SimuEvol*
+## 4. Add features or debug in *SimuEvol*
 You made modifications to the C++ code of the simulation framework *SimuEvol*.
 You wish this changes benefit to all users of these software?
 

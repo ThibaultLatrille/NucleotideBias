@@ -6,7 +6,10 @@ sys.path.append(ROOT)
 BATCH_PATH = "{0}/scripts/hyphy_template.bf".format(ROOT)
 from scripts.snakemake_module import *
 
-NBR_SITES = 1000
+SEED = 42
+EXON_SIZE = 498
+NBR_EXON = 25
+NBR_SITES = EXON_SIZE * NBR_EXON
 MUT_RATE = 5.0
 EXPERIMENT = os.path.abspath('.') + "/n_{0}_mu{1}".format(NBR_SITES, MUT_RATE)
 print(EXPERIMENT)
@@ -23,14 +26,15 @@ os.system('cp {0}/{1} {2}'.format(os.path.abspath('.'), NEWICK, NEWICK_PATH))
 SIMULATION_PARAMS = '--newick ' + NEWICK_PATH
 SIMULATION_PARAMS += ' --mutation_rate_per_generation {0}'.format(MUT_RATE)
 SIMULATION_PARAMS += ' --generation_time {0}'.format(1.0)
-SIMULATION_PARAMS += ' --seed {0}'.format(0)
+SIMULATION_PARAMS += ' --seed {0}'.format(SEED)
 SIMULATION_PARAMS += ' --unused_root_age'
+SIMULATION_PARAMS += ' --exon_size {0}'.format(EXON_SIZE)
 SIMULATION_PARAMS += ' --branch_wise_correlation'
 SIMULATION_PARAMS += ' --fix_pop_size'
 SIMULATION_PARAMS += ' --fix_mut_rate'
 SIMULATION_PARAMS += ' --fix_gen_time'
 
-mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(-1, 1, 20)]
+mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(-1, 1, 32)]
 alpha_array = ["{0:3f}".format(i) for i in np.logspace(-1, 1, 5)]
 for alpha in alpha_array:
     os.makedirs(EXPERIMENT + "/" + alpha, exist_ok=True)
