@@ -6,13 +6,14 @@ def dico_from_file(filename):
     tmp_dico = {}
     tmp_file = open(filename, "r")
     for line in tmp_file:
-        split_line = line.split("=")
-        if len(split_line) > 1:
-            value = split_line[1].strip()
-            try:
-                tmp_dico[split_line[0]] = float(value)
-            except:
-                pass
+        for sub_line in line.split(";"):
+            split_line = sub_line.split("=")
+            if len(split_line) > 1:
+                value = split_line[-1].strip()
+                try:
+                    tmp_dico[split_line[0]] = float(value)
+                except:
+                    pass
     tmp_file.close()
     return tmp_dico
 
@@ -21,11 +22,8 @@ def format_hyphy_dico(hyphy_dico):
     if "pnCG" in hyphy_dico:
         hyphy_dico["pnC"] = hyphy_dico["pnCG"]
         hyphy_dico["pnG"] = hyphy_dico["pnCG"]
-        hyphy_dico["pnA"] = 0.5 - hyphy_dico["pnCG"]
-    hyphy_dico["pnT"] = 1.0 - (hyphy_dico["pnA"] + hyphy_dico["pnC"] + hyphy_dico["pnG"])
-
-    if "epsA" in hyphy_dico and "epsM" not in hyphy_dico:
-        hyphy_dico["epsM"] = 20 - sum([hyphy_dico["eps" + aa] for aa in amino_acids_set if aa != "M"])
+        hyphy_dico["pnA"] = hyphy_dico["pnAT"]
+        hyphy_dico["pnT"] = hyphy_dico["pnAT"]
 
     if 'w' not in hyphy_dico:
         codon_frequencies = np.ones(len(codons))
@@ -79,6 +77,8 @@ def format_hyphy_dico(hyphy_dico):
         for omega_subset in d_dict.keys():
             if d_dict[omega_subset] != 0.0 and (omega_subset not in hyphy_dico):
                 hyphy_dico[omega_subset] = d_dict[omega_subset] / d0_dict[omega_subset]
+
+    return hyphy_dico
 
 
 def equilibrium_lambda(hyphy_dico):

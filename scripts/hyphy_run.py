@@ -1,5 +1,5 @@
 '''  
-T. Latrille (Thibault.latrille@ens-lyon.org), adapted from SJS (stephanie.spielman@gmail.com, https://github.com/clauswilke/Omega_MutSel).
+T. Latrille (Thibault.latrille@ens-lyon.org).
 Script to generate Hyphy batchfile, for a variety of model parameterizations, from an alignment in .fasta and a tree.
 
 USAGE: Usage: python prefs_to_freqs.py <fasta> <newick>. The first argument is the alignment file. The second argument is the newick tree file
@@ -12,11 +12,12 @@ First, we find the F61, F1x4, F3x4 frequencies. We use the global alignment freq
 Second, we set up the hyphy batch file which makes use of these frequencies.
 Third, we generate the MG1 and MG3 matrix files.
 '''
-from codons import codon_table, codons, nucindex
+from codons import *
 import jinja2
 import argparse
 from ete3 import Tree
 from subprocess import run
+
 
 def write_fasta_file(ali_path, fasta_path):
     with open(ali_path, 'r') as ali_file:
@@ -111,18 +112,36 @@ def epsilon_name(codon, omega_param):
     return epsilon
 
 
-def build_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constrains_list):
+def build_nuc_matrices(nuc_freqs, exchan_vars, vars_list, constrains_list):
+    ''' Create MG94-style matrices (use target nucleotide frequencies).  '''
+    matrix = '{4, 4, \n'  # MG94
+
+    for i, source in enumerate(nucleotides):
+        for j, target in enumerate(nucleotides):
+            if i == j: continue
+            # Create string for matrix element
+            element = '{' + str(i) + ',' + str(j) + ',mu*t'
+            if source + target in exchan_vars:
+                element += '*' + exchan_vars[source + target]
+            matrix += element + '*' + str(nuc_freqs[target]) + '} '
+    matrix += '}\n'
+
+    # And save to file.
+    return matrix, array_to_hyphy_freq([str(nuc_freqs[n]) for n in nucleotides])
+
+
+def build_codon_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constrains_list):
     ''' Create MG94-style matrices (use target nucleotide frequencies).  '''
     matrix = '{61, 61, \n'  # MG94
-    codon_freqs = [""] * 61
+    freqs = [""] * 61
     epsilon_set = set()
     omega_set = set()
 
     for i, source in enumerate(codons):
-        codon_freqs[i] = "*".join([nuc_freqs[source[j]] for j in range(3)])
+        freqs[i] = "*".join([nuc_freqs[source[j]] for j in range(3)])
         if omega_param == 95 or omega_param == 20:
             epsilon = epsilon_name(source, omega_param)
-            codon_freqs[i] += "*" + epsilon
+            freqs[i] += "*" + epsilon
             epsilon_set.add(epsilon)
 
         for j, target in enumerate(codons):
@@ -138,10 +157,6 @@ def build_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constrains_li
                 if codon_table[source] != codon_table[target]:
                     if omega_param == 1:
                         omega = 'w'
-                    elif omega_param == 4:
-                        omega = "w_"
-                        for nuc in diff:
-                            omega += weak_strong(nuc)
                     elif omega_param == 95 or omega_param == 20:
                         if omega_param == 95:
                             omega = 'b_' + "".join(sorted(codon_table[source] + codon_table[target]))
@@ -166,12 +181,12 @@ def build_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constrains_li
     vars_list.extend(["global {0}=1.0;".format(v) for v in omega_set])
 
     print("{0} omega parameters out of {1:.0f} possible".format(len(omega_set), 20 * 19 / 2))
-    constrains_list.append("global z:={0};".format("+".join(codon_freqs)))
+    constrains_list.append("global z:={0};".format("+".join(freqs)))
 
-    for i, codon in enumerate(codon_freqs):
-        codon_freqs[i] = codon + "/z"
+    for i, codon in enumerate(freqs):
+        freqs[i] = codon + "/z"
     # And save to file.
-    return matrix, array_to_hyphy_freq(codon_freqs)
+    return matrix, array_to_hyphy_freq(freqs)
 
 
 def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infile,
@@ -195,19 +210,23 @@ def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infil
 
     exchan_vars = build_rates(rate_param, vars_list, constrains_list)
 
-    matrix, codon_freqs = build_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constrains_list)
+    if omega_param == 0:
+        matrix, freqs = build_nuc_matrices(nuc_freqs, exchan_vars, vars_list, constrains_list)
+    else:
+        matrix, freqs = build_codon_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constrains_list)
 
     # Create the hyphy batchfile to include the frequencies calculated here. Note that we need to do this since no
     # actual alignment exists which includes all protein positions, so cannot be read in by hyphy file.
-    tree_file = Tree(tree_infile)
-    tree = tree_file.write(format=0)
+    tree_file = Tree(tree_infile, format=1)
+    tree = tree_file.write(format=1)
 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader("/"))
     template = env.get_template(raw_batchfile)
     template.stream(matrix=matrix,
-                    codon_freqs=codon_freqs,
+                    freqs=freqs,
                     param="r{0}_f{1}_w{2}".format(rate_param, freq_param, omega_param),
                     vars_list=vars_list,
+                    filter_codons_stop=(omega_param != 0),
                     constrains_list=constrains_list,
                     tree=tree, name=name,
                     fasta_infile=fasta_infile).dump(batch_outfile)
@@ -224,7 +243,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--tree', required=True, type=str, dest="tree", help="The path to the newick tree file")
     parser.add_argument('-m', '--model', required=True, type=str, dest="model", help="The parameters of the GTR-Matrix")
     args = parser.parse_args()
-    params_dico = {"MG": "0-3-1", "MF": "0-3-95"}
+    params_dico = {"MG": "5-3-1", "MF": "5-3-95", "GTR": "5-3-0"}
     if args.fasta[-4:] == ".ali":
         ali = args.fasta
         args.fasta = args.fasta.replace(".ali", ".fasta")

@@ -31,15 +31,16 @@ def compute_diversity(frequencies_seq):
 
 
 def open_ali_file(ali_path):
-    ali_list = []
+    species_list, ali_list = [], []
     with open(ali_path, 'r') as ali_file:
         next(ali_file)
         for line in ali_file:
             if line != "\n":
-                _, seq = line.replace("  ", " ").replace("\n", "").split(" ")
+                spe, seq = line.replace("  ", " ").replace("\t", " ").replace("\n", "").split(" ")
                 assert len(seq) % 3 == 0
                 ali_list.append(seq)
-    return ali_list
+                species_list.append(spe)
+    return species_list, ali_list
 
 
 def open_fasta_file(fasta_path):
@@ -105,7 +106,7 @@ def title(p):
     elif "diversity_aa" in p:
         return "Sequence amino-acid diversity"
     elif "omega_" in p and "over" in p:
-        return "Restricted to non-synonymous\nmutations between GC and AT"
+        return "Restricted to non-synonymous mutations\nfrom AT to GC and GC to AT"
     elif "omega_WS" in p:
         return "Restricted to non-synonymous\nmutations from AT to GC"
     elif "omega_SW" in p:
@@ -130,7 +131,8 @@ if __name__ == '__main__':
         x, y = float(f_slash[-1].split("_")[-2]), float(f_slash[-2])
         x_range.add(x)
         y_range.add(y)
-        for param, val in stats_from_ali(open_ali_file(filepath + ".ali")).items():
+        species, alignment = open_ali_file(filepath + ".ali")
+        for param, val in stats_from_ali(alignment).items():
             if param not in dico_params: dico_params[param] = dict()
             dico_params[param][(x, y)] = val
         results_dico = {k: v[0] for k, v in pd.read_csv(filepath + ".tsv", sep='\t').items()}

@@ -1,0 +1,44 @@
+import os
+ROOT = os.path.abspath('..')
+import numpy as np
+import pandas as pd
+import sys
+sys.path.append(ROOT)
+BATCH_PATH = "{0}/scripts/hyphy_template.bf".format(ROOT)
+from scripts.snakemake_module import *
+
+EXPERIMENT = os.path.abspath('.')
+ANCESTRALS = [i.strip() for i in open(EXPERIMENT + "/ancestral.txt", 'r').readlines()]
+print(ANCESTRALS)
+rule all:
+    input: expand(EXPERIMENT + '/GTR_{ancestral}_matrix.tsv', ancestral=ANCESTRALS)
+
+rule filter_ali:
+    output:
+         EXPERIMENT + '/CDS.{ancestral}.fasta'
+    input:
+         ali=EXPERIMENT + '/CDS.ali',
+         tree=EXPERIMENT + '/rootedtree.nhx',
+         exec=ROOT + "/scripts/filter_third_positions.py"
+    shell: 'python3 {input.exec} --input {input.ali} --output {output} --tree {input.tree} --ancestral {wildcards.ancestral}'
+
+
+rule run_inference:
+    output: EXPERIMENT + '/GTR_{ancestral}_run.bf'
+    input:
+         exec=ROOT + "/scripts/hyphy_run.py",
+         fasta=EXPERIMENT + '/CDS.{ancestral}.fasta'
+    params:
+          model=lambda w: "--model GTR",
+          tree=lambda w: "--tree {0}/rootedtree.{1}.nhx".format(EXPERIMENT, w.ancestral),
+          fasta=lambda w: "--fasta {0}/CDS.{1}.fasta".format(EXPERIMENT, w.ancestral)
+    shell: 'python3 {input.exec} --input {BATCH_PATH} {params.model} {params.fasta} {params.tree} --output {output}'
+
+rule analysis:
+    output: EXPERIMENT + '/GTR_{ancestral}_matrix.tsv'
+    input:
+         exec=ROOT + "/scripts/hyphy_to_matrix.py",
+         bf=EXPERIMENT + '/GTR_{ancestral}_run.bf'
+    shell: 'python3 {input.exec} --input {input.bf}_hyout.txt --output {output}'
+
+

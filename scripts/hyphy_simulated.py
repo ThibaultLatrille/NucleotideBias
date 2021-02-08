@@ -17,7 +17,8 @@ if __name__ == '__main__':
         at_gc_pct = float(batch.split("/")[-1].split("_")[0])
 
         exp = batch.replace(args.model + "_run.bf", "exp")
-        ali_dico = stats_from_ali(open_ali_file(exp + ".ali"))
+        species, alignment = open_ali_file(exp + ".ali")
+        ali_dico = stats_from_ali(alignment)
         nested_dict["AT/GC_obs"][at_gc_pct] = ali_dico["at_over_gc"]
 
         hyphy_result = "{0}_hyout.txt".format(batch)
