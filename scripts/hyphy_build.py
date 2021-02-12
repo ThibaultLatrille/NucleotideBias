@@ -250,4 +250,3 @@ if __name__ == '__main__':
         write_fasta_file(ali, args.fasta)
     params = [int(p) for p in params_dico[args.model].split("-")]
     build_hyphy_batchfile(args.output, args.input, args.fasta, args.tree, params[0], params[1], params[2])
-    run("HYPHYMP {0} CPU={1}\n".format(args.output, 1), shell=True)

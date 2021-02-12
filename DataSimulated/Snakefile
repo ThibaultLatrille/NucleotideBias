@@ -11,7 +11,8 @@ configfile: EXPERIMENT + "/config.yaml"
 
 SEED = config['SEED']
 EXON_SIZE = config['EXON_SIZE']
-NBR_SITES = EXON_SIZE * config['NBR_EXON']
+NBR_EXON = config['NBR_EXON']
+NBR_SITES = EXON_SIZE * NBR_EXON
 
 print(EXPERIMENT)
 os.makedirs(EXPERIMENT, exist_ok=True)
@@ -20,7 +21,8 @@ os.makedirs(EXPERIMENT + "/slurm", exist_ok=True)
 os.makedirs(EXPERIMENT + "/benchmarks", exist_ok=True)
 
 NEWICK_PATH = copy_params(EXPERIMENT, ROOT, config['TREE'])
-MUTATION_MATRIX = copy_params(EXPERIMENT, ROOT, config['NUC_MATRIX']) if config['NUC_MATRIX'] else False
+MUTATION_MATRIX = copy_params(EXPERIMENT, ROOT, config['NUC_MATRIX']) if ('NUC_MATRIX' in config) and config['NUC_MATRIX'] else False
+PROFILE = copy_params(EXPERIMENT, ROOT, config['PROFILE']) if ('PROFILE' in config) and config['PROFILE'] else False
 #Parameters for the simulation
 SIMULATION_PARAMS = '--newick ' + NEWICK_PATH
 SIMULATION_PARAMS += ' --mutation_rate_per_generation {0}'.format(config['MUTATION_RATE_PER_GENERATION'])
@@ -33,7 +35,7 @@ SIMULATION_PARAMS += ' --fix_mut_rate'
 SIMULATION_PARAMS += ' --fix_gen_time'
 
 if MUTATION_MATRIX:
-    mut_bias_array = list(range(1, config['REPLICATES']))
+    mut_bias_array = list(range(1, config['REPLICATES'] + 1))
 else:
     mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(config['LAMBDA_ARRAY_LOG10_MIN'], config['LAMBDA_ARRAY_LOG10_MAX'], config['LAMBDA_ARRAY_STEPS'])]
 
@@ -44,7 +46,7 @@ for alpha in alpha_array:
 for program in ['SimuEvol']:
     diff_git_dir("{0}/{1}".format(ROOT, program), "{0}/{1}".format(EXPERIMENT, program))
 
-localrules: all, cp_simuevol, generate_profile, generate_matrix, plot_simulations, simulation, inference,
+localrules: all, cp_simuevol, create_profile, generate_matrix, plot_simulations, simulation, build_batchfile, inference,
           merge_inference, hyphy_simulated
 
 rule all:
@@ -57,13 +59,18 @@ rule cp_simuevol:
     input: dir=EXPERIMENT + '/SimuEvol.version'
     shell: 'cd {ROOT}/SimuEvol && cp build/SimuProfile {EXPERIMENT}'
 
-rule generate_profile:
-    output: EXPERIMENT + '/{alpha}_profile.prefs'
-    input:
-         exec=ROOT + "/scripts/generate_profile.py"
-    params:
-          alpha=lambda w: "--alpha {0}".format(w.alpha)
-    shell: 'python3 {input.exec} {params.alpha} --nbr_sites {NBR_SITES} --output {output}'
+if PROFILE:
+    rule create_profile:
+        output: EXPERIMENT + '/{alpha}_profile.prefs'
+        input: ROOT + "/scripts/extend_profile.py"
+        params:
+              alpha=lambda w: "--relative {0}".format(w.alpha)
+        shell: 'python3 {input} --input {PROFILE} --relative_pop_size {wildcards.alpha} --nbr_exons {NBR_EXON} --output {output}'
+else:
+    rule create_profile:
+        output: EXPERIMENT + '/{alpha}_profile.prefs'
+        input: ROOT + "/scripts/generate_profile.py"
+        shell: 'python3 {input} --alpha {wildcards.alpha} --nbr_sites {NBR_SITES} --output {output}'
 
 rule generate_matrix:
     output: EXPERIMENT + '/{mut_bias}_matrix.tsv'
@@ -77,7 +84,7 @@ rule run_simulation:
     output: touch(EXPERIMENT + '/{alpha}/{mut_bias}_exp')
     input:
          exec=rules.cp_simuevol.output,
-         prefs=rules.generate_profile.output,
+         prefs=rules.create_profile.output,
          matrix=MUTATION_MATRIX if MUTATION_MATRIX else rules.generate_matrix.output
     params:
          time="0-4:00", mem=1000, threads=1,
@@ -98,21 +105,25 @@ rule plot_simulations:
 rule simulation:
     input: EXPERIMENT + '/plot_simulation'
 
-rule run_inference:
-    output:
-        batch=EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf',
-        result=EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt'
+rule build_batchfile:
+    output: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf'
     input:
-         exec=ROOT + "/scripts/hyphy_run.py",
+         exec=ROOT + "/scripts/hyphy_build.py",
          exp=rules.run_simulation.output
     params:
           time="1-23:00", mem=2000, threads=1,
           model=lambda w: "--model {0}".format(w.model)
+    shell: 'python3 {input.exec} --input {BATCH_PATH} --fasta {input.exp}.ali {params.model} --tree {NEWICK_PATH} --output {output}'
+
+rule run_inference:
+    output: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt'
+    input: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf'
+    params: time="1-23:00", mem=2000, threads=1
     benchmark: EXPERIMENT + "/benchmarks/inference.{alpha}_{mut_bias}_{model}_run.tsv"
     log:
          out=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stdout',
          err=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stderr'
-    shell: 'python3 {input.exec} --input {BATCH_PATH} --fasta {input.exp}.ali {params.model} --tree {NEWICK_PATH} --output {output.batch} 2> {log.err} 1> {log.out}'
+    shell: 'HYPHYMP {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
 
 rule inference:
     input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt', mut_bias=mut_bias_array, model=config['MODELS'], alpha=alpha_array)

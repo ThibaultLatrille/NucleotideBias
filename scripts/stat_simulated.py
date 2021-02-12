@@ -57,10 +57,10 @@ def open_fasta_file(fasta_path):
     return species_list, ali_list
 
 
-def omega_pairwise_from_profile(profile_file, at_over_gc, alpha):
+def omega_pairwise_from_profile(profile_file, at_over_gc):
     assert (os.path.isfile(profile_file))
     df = pd.read_csv(profile_file, sep=",")
-    profiles = np.power(df.drop('site', axis=1).values, alpha)
+    profiles = np.power(df.drop('site', axis=1).values)
     fitnesses = np.log(profiles)
     inv_profiles = 1.0 / profiles
     nbr_sites = len(profiles)

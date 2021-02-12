@@ -11,6 +11,8 @@ experiment_array = [i for i in os.listdir(os.path.abspath('.')) if (os.path.isdi
 print(experiment_array)
 models = ["MG", "MF", "GTR"]
 
+localrules: all, filter_ali, build_batchfile, result_inference, merge_results
+
 rule all:
     input: EXPERIMENT + '/merged_results.tsv'
 
@@ -22,19 +24,24 @@ rule filter_ali:
          exec=ROOT + "/scripts/filter_third_positions.py"
     shell: 'python3 {input.exec} --input {input.ali} --output {output} '
 
-rule run_inference:
-    output:
-        batch=EXPERIMENT + '/{experiment}/{model}_run.bf',
-        result=EXPERIMENT + '/{experiment}/{model}_run.bf_hyout.txt'
+rule build_batchfile:
+    output: EXPERIMENT + '/{experiment}/{model}_run.bf'
     input:
          exec=ROOT + "/scripts/hyphy_run.py",
          fasta=lambda w: "{0}/{1}/alignment{2}.fasta".format(EXPERIMENT, w.experiment, ".ThirdPos" if w.model == "GTR" else ""),
          tree=lambda w: "{0}/{1}/tree.newick".format(EXPERIMENT, w.experiment),
+    shell: 'python3 {input.exec} --input {BATCH_PATH} --model {wildcards.model} --fasta {input.fasta} --tree {input.tree} --output {output}'
+
+
+rule run_inference:
+    output: EXPERIMENT + '/{experiment}/{model}_run.bf_hyout.txt'
+    input: EXPERIMENT + '/{experiment}/{model}_run.bf'
     benchmark: EXPERIMENT + "/{experiment}/{model}.benchmark.tsv"
+    params: time="1-23:00", mem=2000, threads=1
     log:
          out=EXPERIMENT + '/{experiment}/{model}.stdout',
          err=EXPERIMENT + '/{experiment}/{model}.stderr'
-    shell: 'python3 {input.exec} --input {BATCH_PATH} --model {wildcards.model} --fasta {input.fasta} --tree {input.tree} --output {output.batch} 2> {log.err} 1> {log.out}'
+    shell: 'HYPHYMP {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
 
 rule result_inference:
     output: EXPERIMENT + '/{experiment}/results.tsv'

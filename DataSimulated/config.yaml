@@ -1,6 +1,7 @@
 MODELS: [MG, MF]
 TREE: DataSimulated/trees/rootedtree.Simiiformes.nhx
 MUTATION_RATE_PER_GENERATION: 2.0
+PROFILE: DataSimulated/preferences/np.prefs
 EXON_SIZE: 498
 NBR_EXON: 15
 SEED: 42
