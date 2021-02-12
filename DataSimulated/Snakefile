@@ -16,6 +16,7 @@ NBR_SITES = EXON_SIZE * config['NBR_EXON']
 print(EXPERIMENT)
 os.makedirs(EXPERIMENT, exist_ok=True)
 os.makedirs(EXPERIMENT + "/std", exist_ok=True)
+os.makedirs(EXPERIMENT + "/slurm", exist_ok=True)
 os.makedirs(EXPERIMENT + "/benchmarks", exist_ok=True)
 
 NEWICK_PATH = copy_params(EXPERIMENT, ROOT, config['TREE'])
@@ -79,7 +80,7 @@ rule run_simulation:
          prefs=rules.generate_profile.output,
          matrix=MUTATION_MATRIX if MUTATION_MATRIX else rules.generate_matrix.output
     params:
-         time="3-23:00", mem=300, threads=1,
+         time="0-4:00", mem=1000, threads=1,
          seed=lambda w: int(w.mut_bias) * 10**3 if MUTATION_MATRIX else SEED
     benchmark: EXPERIMENT + "/benchmarks/exp_{alpha}_{mut_bias}.tsv"
     log:
@@ -105,7 +106,7 @@ rule run_inference:
          exec=ROOT + "/scripts/hyphy_run.py",
          exp=rules.run_simulation.output
     params:
-          time="1-23:00", mem=1000, threads=1,
+          time="1-23:00", mem=2000, threads=1,
           model=lambda w: "--model {0}".format(w.model)
     benchmark: EXPERIMENT + "/benchmarks/inference.{alpha}_{mut_bias}_{model}_run.tsv"
     log:

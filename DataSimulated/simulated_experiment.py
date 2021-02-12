@@ -16,8 +16,8 @@ def create_experiment(experiment, screen, sbatch, nbr_cpu):
         w.write("#!/usr/bin/env bash\n")
         run_str = 'snakemake '
         if sbatch:
-            run_str += '-j 99 --cluster "sbatch -J {0} -p long -N 1 ' \
-                       '-o {1}/slurm.%x.%j.out -e {1}/slurm.%x.%j.err '.format(experiment, exp_path)
+            run_str += '-j 99 --cluster "sbatch -J {0} -p normal -N 1 ' \
+                       '-o {1}/slurm/%x.%j.out -e {1}/slurm/%x.%j.err '.format(experiment, exp_path)
             run_str += '--cpus-per-task={params.threads} --mem={params.mem} -t {params.time}"\n'
         else:
             run_str += "-j {0} --printshellcmds".format(nbr_cpu)
@@ -39,8 +39,8 @@ def create_experiment(experiment, screen, sbatch, nbr_cpu):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-e', '--experiment', required=True, type=str, default="", dest="experiment")
-    parser.add_argument('-s', '--screen', required=False, type=bool, default=False, dest="screen")
-    parser.add_argument('-b', '--sbatch', required=False, type=bool, default=False, dest="sbatch")
+    parser.add_argument('-s', '--screen', required=False, type=bool, default=True, dest="screen")
+    parser.add_argument('-b', '--sbatch', required=False, type=bool, default=True, dest="sbatch")
     parser.add_argument('-c', '--nbr_cpu', required=False, type=int, default=4, dest="nbr_cpu")
     args = parser.parse_args()
     create_experiment(args.experiment, args.screen, args.sbatch, args.nbr_cpu)
