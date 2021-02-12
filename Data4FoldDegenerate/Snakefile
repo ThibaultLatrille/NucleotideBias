@@ -22,7 +22,6 @@ rule filter_ali:
          exec=ROOT + "/scripts/filter_third_positions.py"
     shell: 'python3 {input.exec} --input {input.ali} --output {output} --tree {input.tree} --ancestral {wildcards.ancestral}'
 
-
 rule run_inference:
     output: EXPERIMENT + '/GTR_{ancestral}_run.bf'
     input:
