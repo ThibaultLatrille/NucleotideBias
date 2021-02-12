@@ -42,7 +42,7 @@ amino_acids_set = set(codon_table.values())
 amino_acids_set.remove('X')
 
 aa_char_to_int = {v: k for k, v in enumerate(sorted(amino_acids_set))}
-amino_acids = "".join(amino_acids_set)
+amino_acids = "".join(sorted(amino_acids_set))
 assert len(amino_acids) == 20, "There is not 20 amino-acids in the codon table"
 
 
@@ -85,9 +85,22 @@ def generate_neighbors(synonymous=True, subset=""):
     return neighbor_dict
 
 
+def generate_neighbors_aa(codon_neighbors):
+    out = np.zeros((len(amino_acids), len(amino_acids)), dtype=np.bool)
+    for k, v in codon_neighbors.items():
+        if codon_table[codons[k]] == "X": continue
+        source = aa_char_to_int[codon_table[codons[k]]]
+        for target in set([aa_char_to_int[codon_table[codons[c]]] for c, _, _ in v if codon_table[codons[c]] != 'X']):
+            out[source, target] = 1
+
+    assert ((out.T == out).all())
+    return out
+
+
 aa_table = generate_aa_table()
 codon_to_aa = generate_c_to_aa()
 non_syn_neighbors = generate_neighbors(synonymous=False)
+aa_neighbors = generate_neighbors_aa(non_syn_neighbors)
 syn_neighbors = generate_neighbors(synonymous=True)
 all_neighbors = {k: non_syn_neighbors[k] + syn_neighbors[k] for k in syn_neighbors.keys()}
 assert len(all_neighbors) == 61

@@ -3,7 +3,39 @@ import argparse
 import pandas as pd
 from plot_module import *
 from hyphy_format import *
-from stat_simulated import stats_from_ali, open_ali_file
+import statsmodels.api as sm
+from stat_simulated import stats_from_ali, open_ali_file, omega_pairwise_from_profile
+
+
+def plot_pairwise_matrices(predicted, estimated, output):
+    fig, axs = plt.subplots(1, 3, figsize=(16, 6))
+    fig.colorbar(axs[0].imshow(predicted), ax=axs[0], orientation='horizontal', fraction=.1)
+    axs[0].set_title('$\\omega$ predicted between pairs of amino-acids')
+    fig.colorbar(axs[1].imshow(estimated), ax=axs[1], orientation='horizontal', fraction=.1)
+    axs[1].set_title('$\\widehat{\\omega}$ estimated between pairs of amino-acids')
+
+    filt = np.logical_and(np.isfinite(predicted) & np.isfinite(estimated), estimated > 0)
+    x = predicted[filt].flatten()
+    y = estimated[filt].flatten()
+    axs[2].scatter(x, y)
+    axs[2].set_title('$\\omega$ between pairs of amino-acids')
+
+    model = sm.OLS(y, sm.add_constant(x))
+    results = model.fit()
+    b, a = results.params[0:2]
+    idf = np.linspace(min(x), max(x), 100)
+    axs[2].plot(idf, a * idf + b, '-',
+                label=r"$y={0:.2g}x {3} {1:.2g}$ ($r^2={2:.2g})$".format(a, abs(b), results.rsquared,
+                                                                         "+" if float(b) > 0 else "-"))
+    axs[2].set_xlabel('Predicted')
+    axs[2].set_ylabel('Estimated')
+    axs[2].legend()
+    fig.tight_layout()
+    plt.savefig(output + ".pdf", format="pdf")
+    plt.savefig(output + ".png", format="png")
+    plt.clf()
+    plt.close('all')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -13,17 +45,23 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     nested_dict = nested_dict_init()
+    predicted_array, estimated_array = [], []
     for batch in args.input:
         at_gc_pct = float(batch.split("/")[-1].split("_")[0])
-
-        exp = batch.replace(args.model + "_run.bf", "exp")
+        alpha = float(batch.split("/")[-2])
+        exp = batch.replace(args.model + "_run.bf_hyout.txt", "exp")
         species, alignment = open_ali_file(exp + ".ali")
         ali_dico = stats_from_ali(alignment)
         nested_dict["AT/GC_obs"][at_gc_pct] = ali_dico["at_over_gc"]
 
-        hyphy_result = "{0}_hyout.txt".format(batch)
-        hyphy_dico = dico_from_file(hyphy_result)
+        hyphy_dico = dico_from_file(batch)
         format_hyphy_dico(hyphy_dico)
+
+        if args.model == "MF":
+            profile_path = "/".join(batch.split("/")[:-1]) + "_profile.prefs"
+            predicted_array.append(omega_pairwise_from_profile(profile_path, at_gc_pct, 1.0))
+            estimated_array.append(omega_pairwise_from_hyphy(hyphy_dico))
+            plot_pairwise_matrices(predicted_array[-1], estimated_array[-1], "{0}/omega.{1}".format(args.output, at_gc_pct))
 
         results_dico = {k: v[0] for k, v in pd.read_csv(exp + ".tsv", sep='\t').items()}
         nested_dict["w_obs"][at_gc_pct] = results_dico["dnd0_event_tot"]
@@ -35,9 +73,12 @@ if __name__ == '__main__':
 
         nested_dict["AT/GC_inf"][at_gc_pct] = equilibrium_lambda(hyphy_dico)
 
-    my_dpi = 96
+    if args.model == "MF":
+        estimated_mean = np.mean(estimated_array, axis=0)
+        predicted_mean = np.mean(predicted_array, axis=0)
+        plot_pairwise_matrices(predicted_mean, estimated_mean, "{0}/mean.omega".format(args.output))
+
     fig, ax = plt.subplots()
-    index = 0
     list_plot = list()
     list_plot.append(
         {"experiment": "AT/GC_obs", "color": BLUE, "linestyle": '-', "linewidth": 2,
@@ -72,7 +113,7 @@ if __name__ == '__main__':
     ax.legend()
     ax.set_title(args.model)
     plt.tight_layout()
-    plt.savefig("{0}.pdf".format(args.output), format="pdf")
-    plt.savefig("{0}.png".format(args.output), format="png")
+    plt.savefig("{0}/lambda.pdf".format(args.output), format="pdf")
+    plt.savefig("{0}/lambda.png".format(args.output), format="png")
     plt.clf()
     plt.close('all')

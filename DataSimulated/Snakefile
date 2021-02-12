@@ -1,32 +1,29 @@
-import os
-ROOT = os.path.abspath('..')
 import numpy as np
+import os
+ROOT = os.path.abspath('../../..')
 import sys
 sys.path.append(ROOT)
 BATCH_PATH = "{0}/scripts/hyphy_template.bf".format(ROOT)
 from scripts.snakemake_module import *
 
-SEED = 42
-EXON_SIZE = 498
-NBR_EXON = 25
-NBR_SITES = EXON_SIZE * NBR_EXON
-MUT_RATE = 5.0
-EXPERIMENT = os.path.abspath('.') + "/n_{0}_mu{1}".format(NBR_SITES, MUT_RATE)
+EXPERIMENT = os.path.abspath('.')
+configfile: EXPERIMENT + "/config.yaml"
+
+SEED = config['SEED']
+EXON_SIZE = config['EXON_SIZE']
+NBR_SITES = EXON_SIZE * config['NBR_EXON']
+
 print(EXPERIMENT)
 os.makedirs(EXPERIMENT, exist_ok=True)
 os.makedirs(EXPERIMENT + "/std", exist_ok=True)
 os.makedirs(EXPERIMENT + "/benchmarks", exist_ok=True)
 
-NEWICK = "np.newick"
-NEWICK_PATH = "{0}/{1}".format(EXPERIMENT, NEWICK)
-os.system('cp {0}/{1} {2}'.format(os.path.abspath('.'), NEWICK, NEWICK_PATH))
-
-
+NEWICK_PATH = copy_params(EXPERIMENT, ROOT, config['TREE'])
+MUTATION_MATRIX = copy_params(EXPERIMENT, ROOT, config['NUC_MATRIX']) if config['NUC_MATRIX'] else False
 #Parameters for the simulation
 SIMULATION_PARAMS = '--newick ' + NEWICK_PATH
-SIMULATION_PARAMS += ' --mutation_rate_per_generation {0}'.format(MUT_RATE)
+SIMULATION_PARAMS += ' --mutation_rate_per_generation {0}'.format(config['MUTATION_RATE_PER_GENERATION'])
 SIMULATION_PARAMS += ' --generation_time {0}'.format(1.0)
-SIMULATION_PARAMS += ' --seed {0}'.format(SEED)
 SIMULATION_PARAMS += ' --unused_root_age'
 SIMULATION_PARAMS += ' --exon_size {0}'.format(EXON_SIZE)
 SIMULATION_PARAMS += ' --branch_wise_correlation'
@@ -34,20 +31,22 @@ SIMULATION_PARAMS += ' --fix_pop_size'
 SIMULATION_PARAMS += ' --fix_mut_rate'
 SIMULATION_PARAMS += ' --fix_gen_time'
 
-mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(-1, 1, 32)]
-alpha_array = ["{0:3f}".format(i) for i in np.logspace(-1, 1, 5)]
+if MUTATION_MATRIX:
+    mut_bias_array = list(range(1, config['LAMBDA_ARRAY_STEPS']))
+else:
+    mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(config['LAMBDA_ARRAY_LOG10_MIN'], config['LAMBDA_ARRAY_LOG10_MAX'], config['LAMBDA_ARRAY_STEPS'])]
+
+alpha_array = ["{0:3f}".format(i) for i in np.logspace(config['ALPHA_ARRAY_LOG10_MIN'], config['ALPHA_ARRAY_LOG10_MAX'], config['ALPHA_ARRAY_STEPS'])]
 for alpha in alpha_array:
     os.makedirs(EXPERIMENT + "/" + alpha, exist_ok=True)
-models = ["MG", "MF"]
 
 for program in ['SimuEvol']:
     diff_git_dir("{0}/{1}".format(ROOT, program), "{0}/{1}".format(EXPERIMENT, program))
 
-
 rule all:
     input:
          EXPERIMENT + '/plot_simulation',
-         # EXPERIMENT + '/plot_hyphy'
+         EXPERIMENT + '/plot_hyphy'
 
 rule cp_simuevol:
     output: EXPERIMENT + '/SimuProfile',
@@ -70,18 +69,19 @@ rule generate_matrix:
           mut_bias=lambda w: "--lambda {0}".format(w.mut_bias)
     shell: 'python3 {input.exec} {params.mut_bias} --output {output}'
 
-
 rule run_simulation:
     output: touch(EXPERIMENT + '/{alpha}/{mut_bias}_exp')
     input:
          exec=rules.cp_simuevol.output,
          prefs=rules.generate_profile.output,
-         matrix=rules.generate_matrix.output
+         matrix=MUTATION_MATRIX if MUTATION_MATRIX else rules.generate_matrix.output
+    params:
+         seed=lambda w: int(w.mut_bias) * 10**3 if MUTATION_MATRIX else SEED
     benchmark: EXPERIMENT + "/benchmarks/exp_{alpha}_{mut_bias}.tsv"
     log:
         out=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}.stdout',
         err=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}.stderr'
-    shell: '{input.exec} {SIMULATION_PARAMS}  --nuc_matrix {input.matrix} --preferences {input.prefs} --output {output} 2> {log.err} 1> {log.out}'
+    shell: '{input.exec} {SIMULATION_PARAMS} --seed {params.seed} --nuc_matrix {input.matrix} --preferences {input.prefs} --output {output} 2> {log.err} 1> {log.out}'
 
 rule plot_simulations:
     output: directory(EXPERIMENT + '/plot_simulation')
@@ -90,8 +90,13 @@ rule plot_simulations:
          exp=expand(rules.run_simulation.output, alpha=alpha_array, mut_bias=mut_bias_array)
     shell: 'mkdir -p {output} && python3 {input.src} --input {input.exp} --output {output}'
 
+rule simulation:
+    input: EXPERIMENT + '/plot_simulation'
+
 rule run_inference:
-    output: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf'
+    output:
+        batch=EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf',
+        result=EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt'
     input:
          exec=ROOT + "/scripts/hyphy_run.py",
          exp=rules.run_simulation.output
@@ -101,21 +106,23 @@ rule run_inference:
     log:
          out=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stdout',
          err=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stderr'
-    shell: 'python3 {input.exec} --input {BATCH_PATH} --fasta {input.exp}.ali {params.model} --tree {NEWICK_PATH} --output {output} 2> {log.err} 1> {log.out}'
+    shell: 'python3 {input.exec} --input {BATCH_PATH} --fasta {input.exp}.ali {params.model} --tree {NEWICK_PATH} --output {output.batch} 2> {log.err} 1> {log.out}'
+
+rule inference:
+    input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt', mut_bias=mut_bias_array, model=config['MODELS'], alpha=alpha_array)
 
 rule merge_inference:
-    output: touch(EXPERIMENT + '/{model}_plot')
+    output: directory(EXPERIMENT + '/{alpha}/{model}_plot')
     input:
          src=ROOT + "/scripts/hyphy_simulated.py",
-         infer=expand(EXPERIMENT + '/{alpha}/{mut_bias}_{{model}}_run.bf', alpha=[alpha_array[0]], mut_bias=mut_bias_array)
+         infer=expand(EXPERIMENT + '/{{alpha}}/{mut_bias}_{{model}}_run.bf_hyout.txt', mut_bias=mut_bias_array)
     params:
          model=lambda w: "--model {0}".format(w.model)
     shell:
-         'python3 {input.src} {params.model} --trace {input.infer} --output {output}'
-
+         'mkdir -p {output} && python3 {input.src} {params.model} --trace {input.infer} --output {output}'
 
 rule hyphy_simulated:
     output: plot=touch(EXPERIMENT + '/plot_hyphy')
-    input: expand(EXPERIMENT + '/{model}_plot', model=models)
+    input: expand(EXPERIMENT + '/{alpha}/{model}_plot', model=config['MODELS'], alpha=alpha_array)
 
 

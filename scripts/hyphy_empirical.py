@@ -10,12 +10,13 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input', required=True, type=str, nargs='+', dest="input")
     args = parser.parse_args()
 
-    out_dico = stats_from_ali(open_fasta_file("/".join(args.output.split("/")[:-1]) + "/alignment.fasta"))
+    species, ali = open_fasta_file("/".join(args.output.split("/")[:-1]) + "/alignment.fasta")
+    out_dico = stats_from_ali(ali)
     out_dico["name"] = args.output.split("/")[-2]
 
     for hyphy_result in args.input:
         model = hyphy_result.split("/")[-1].split("_")[-2]
-        hyphy_dico = dico_from_file(hyphy_result + "_hyout.txt")
+        hyphy_dico = dico_from_file(hyphy_result)
         format_hyphy_dico(hyphy_dico)
 
         out_dico["w_" + model] = hyphy_dico["w"]

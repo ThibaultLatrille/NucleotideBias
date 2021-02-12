@@ -8,9 +8,14 @@
 .idea/
 /SimuEvol
 /manuscript
+/venv
 /data
+/DataSimulated/Experiments/*
 /DataSimulated/n_*
-/DataEmpirical/*
+/DataSimulated/N_*
+/Data4FoldDegenerate/CDS.*.fasta
+/Data4FoldDegenerate/rootedtree.*.nhx
+/notebooks/*
 /*/.snakemake
 *.7z
 .ipynb_checkpoints/
@@ -31,3 +36,11 @@
 *.bbl
 *.blg
 *.contdiff
+alignment.ThirdPos.fasta
+tree.extant.newick
+GTR_*
+MG_*
+MF_*
+GTR.*
+MG.*
+MF.*

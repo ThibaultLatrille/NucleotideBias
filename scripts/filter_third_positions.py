@@ -2,7 +2,7 @@
 import argparse
 from codons import codon_table
 import numpy as np
-from stat_simulated import open_ali_file
+from stat_simulated import open_ali_file, open_fasta_file
 from ete3 import Tree
 
 if __name__ == '__main__':
@@ -13,7 +13,14 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--ancestral', required=False, default="", type=str, dest="ancestral")
     args = parser.parse_args()
 
-    species, alignment = open_ali_file(args.input)
+    if ".ali" in args.input:
+        species, alignment = open_ali_file(args.input)
+        filt_fasta = open(args.input.replace(".ali", ".fasta"), 'w')
+        for id_sp, sp in enumerate(species):
+            filt_fasta.write(">{0}\n{1}\n".format(sp, alignment[id_sp]))
+        filt_fasta.close()
+    else:
+        species, alignment = open_fasta_file(args.input)
     dict_ali = {sp: alignment[i] for i, sp in enumerate(species)}
     if args.tree:
         t = Tree(args.tree, format=1)
@@ -23,6 +30,11 @@ if __name__ == '__main__':
         species = anc_nodes[0].get_leaf_names()
         alignment = [dict_ali[sp] for sp in species]
         anc_nodes[0].write(outfile=args.tree.replace(".nhx", "." + args.ancestral + ".nhx"), format=1)
+
+        filt_fasta = open(args.output.replace(".fasta", ".codons.fasta"), 'w')
+        for id_sp, sp in enumerate(species):
+            filt_fasta.write(">{0}\n{1}\n".format(sp, dict_ali[sp]))
+        filt_fasta.close()
 
     alignment = np.array([list(s) for s in alignment])
     filtered_sites = []

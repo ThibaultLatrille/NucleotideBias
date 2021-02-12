@@ -5,6 +5,7 @@ import os
 from collections import Counter
 from hyphy_format import *
 from plot_module import *
+from codons import amino_acids
 
 
 def simpson_diversity(frequencies):
@@ -44,14 +45,49 @@ def open_ali_file(ali_path):
 
 
 def open_fasta_file(fasta_path):
-    ali_list = []
+    species_list, ali_list = [], []
     with open(fasta_path, 'r') as fasta_file:
         for seq_unstriped in fasta_file:
             if seq_unstriped[0] != ">":
                 seq = seq_unstriped.strip().replace("\n", "")
                 assert len(seq) % 3 == 0
                 ali_list.append(seq)
-    return ali_list
+            else:
+                species_list.append(seq_unstriped.replace(">", ""))
+    return species_list, ali_list
+
+
+def omega_pairwise_from_profile(profile_file, at_over_gc, alpha):
+    assert (os.path.isfile(profile_file))
+    df = pd.read_csv(profile_file, sep=",")
+    profiles = np.power(df.drop('site', axis=1).values, alpha)
+    fitnesses = np.log(profiles)
+    inv_profiles = 1.0 / profiles
+    nbr_sites = len(profiles)
+    codon_frequencies = np.ones((nbr_sites, len(codons)))
+    for site in range(nbr_sites):
+        for codon_index, codon in enumerate(codons):
+            for nuc in codon:
+                codon_frequencies[site, codon_index] *= (at_over_gc if nuc in weak_nucleotides else 1.0)
+            codon_frequencies[site, codon_index] *= profiles[site, aa_char_to_int[codon_table[codon]]]
+
+    z_sites = 1.0 / codon_frequencies.sum(axis=1)
+
+    omega_array = np.zeros((len(amino_acids), len(amino_acids)))
+    omega_array[:] = np.NaN
+
+    for source, aa_source in enumerate(amino_acids):
+        for target, aa_target in enumerate(amino_acids):
+            if not aa_neighbors[source, target]: continue
+
+            omega_array[source, target] = 0.0
+            for site in range(nbr_sites):
+                omega_array[source, target] += z_sites[site] * (fitnesses[site, target] - fitnesses[site, source]) / (
+                        inv_profiles[site, source] - inv_profiles[site, target])
+
+            omega_array[source, target] /= np.sum([z_sites[site] * profiles[site, source] for site in range(nbr_sites)])
+            assert (omega_array[source, target] >= 0.0)
+    return omega_array
 
 
 def stats_from_ali(alignment):
@@ -70,7 +106,6 @@ def stats_from_ali(alignment):
     aa_freqs = np.zeros((nbr_sites, len(amino_acids)))
     for site in range(nbr_sites):
         count = Counter("".join(codon_table[s[site * 3:(site + 1) * 3]] for s in alignment))
-        assert ("X" not in count)
         for aa in amino_acids:
             aa_freqs[site, aa_char_to_int[aa]] = count[aa]
     aa_freqs /= len(alignment)

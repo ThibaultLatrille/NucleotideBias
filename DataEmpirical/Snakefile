@@ -23,7 +23,9 @@ rule filter_ali:
     shell: 'python3 {input.exec} --input {input.ali} --output {output} '
 
 rule run_inference:
-    output: EXPERIMENT + '/{experiment}/{model}_run.bf'
+    output:
+        batch=EXPERIMENT + '/{experiment}/{model}_run.bf',
+        result=EXPERIMENT + '/{experiment}/{model}_run.bf_hyout.txt'
     input:
          exec=ROOT + "/scripts/hyphy_run.py",
          fasta=lambda w: "{0}/{1}/alignment{2}.fasta".format(EXPERIMENT, w.experiment, ".ThirdPos" if w.model == "GTR" else ""),
@@ -32,13 +34,13 @@ rule run_inference:
     log:
          out=EXPERIMENT + '/{experiment}/{model}.stdout',
          err=EXPERIMENT + '/{experiment}/{model}.stderr'
-    shell: 'python3 {input.exec} --input {BATCH_PATH} --model {wildcards.model} --fasta {input.fasta} --tree {input.tree} --output {output} 2> {log.err} 1> {log.out}'
+    shell: 'python3 {input.exec} --input {BATCH_PATH} --model {wildcards.model} --fasta {input.fasta} --tree {input.tree} --output {output.batch} 2> {log.err} 1> {log.out}'
 
 rule result_inference:
     output: EXPERIMENT + '/{experiment}/results.tsv'
     input:
          src=ROOT + "/scripts/hyphy_empirical.py",
-         infer=expand(EXPERIMENT + '/{{experiment}}/{model}_run.bf', model=models)
+         infer=expand(EXPERIMENT + '/{{experiment}}/{model}_run.bf_hyout.txt', model=models)
     shell:
          'python3 {input.src} --input {input.infer} --output {output}'
 
