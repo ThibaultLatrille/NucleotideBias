@@ -32,7 +32,7 @@ SIMULATION_PARAMS += ' --fix_mut_rate'
 SIMULATION_PARAMS += ' --fix_gen_time'
 
 if MUTATION_MATRIX:
-    mut_bias_array = list(range(1, config['LAMBDA_ARRAY_STEPS']))
+    mut_bias_array = list(range(1, config['REPLICATES']))
 else:
     mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(config['LAMBDA_ARRAY_LOG10_MIN'], config['LAMBDA_ARRAY_LOG10_MAX'], config['LAMBDA_ARRAY_STEPS'])]
 
@@ -42,6 +42,9 @@ for alpha in alpha_array:
 
 for program in ['SimuEvol']:
     diff_git_dir("{0}/{1}".format(ROOT, program), "{0}/{1}".format(EXPERIMENT, program))
+
+localrules: all, cp_simuevol, generate_profile, generate_matrix, plot_simulations, simulation, inference,
+          merge_inference, hyphy_simulated
 
 rule all:
     input:
@@ -76,6 +79,7 @@ rule run_simulation:
          prefs=rules.generate_profile.output,
          matrix=MUTATION_MATRIX if MUTATION_MATRIX else rules.generate_matrix.output
     params:
+         time="3-23:00", mem=300, threads=1,
          seed=lambda w: int(w.mut_bias) * 10**3 if MUTATION_MATRIX else SEED
     benchmark: EXPERIMENT + "/benchmarks/exp_{alpha}_{mut_bias}.tsv"
     log:
@@ -101,6 +105,7 @@ rule run_inference:
          exec=ROOT + "/scripts/hyphy_run.py",
          exp=rules.run_simulation.output
     params:
+          time="1-23:00", mem=1000, threads=1,
           model=lambda w: "--model {0}".format(w.model)
     benchmark: EXPERIMENT + "/benchmarks/inference.{alpha}_{mut_bias}_{model}_run.tsv"
     log:
