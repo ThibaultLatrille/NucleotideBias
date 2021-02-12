@@ -17,9 +17,9 @@ def create_experiment(experiment, screen, sbatch, nbr_cpu):
         run_str = 'snakemake '
         if sbatch:
             run_str += '-j 99 --cluster "sbatch -J {0} -p normal -N 1 ' \
-                       '-o {1}/slurm/%x.%j.out -e {1}/slurm/%x.%j.err '.format(experiment, exp_path)
-            run_str += "--constraint='haswell|skylake|broadwell'"
-            run_str += '--cpus-per-task={params.threads} --mem={params.mem} -t {params.time}"\n'
+                       '-o {1}/slurm/%x.%j.out -e {1}/slurm/%x.%j.err'.format(experiment, exp_path)
+            run_str += " --constraint='haswell|skylake|broadwell'"
+            run_str += ' --cpus-per-task={params.threads} --mem={params.mem} -t {params.time}"\n'
         else:
             run_str += "-j {0} --printshellcmds".format(nbr_cpu)
         w.write(run_str)

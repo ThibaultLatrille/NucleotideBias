@@ -18,4 +18,4 @@ if __name__ == '__main__':
     df = pd.DataFrame(np.concatenate([profiles] * args.nbr_exons, axis=0), columns=preferences.columns[1:])
     a = range(1, profiles.shape[0] + 1)
     df["site"] = range(1, profiles.shape[0] * args.nbr_exons + 1)
-    df.to_csv(args.output, sep=',', encoding='utf-8', index=False)
+    df.to_csv(args.output, sep=',', encoding='utf-8', index=False, columns=preferences.columns)
