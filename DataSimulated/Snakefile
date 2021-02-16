@@ -52,7 +52,7 @@ localrules: all, cp_simuevol, create_profile, generate_matrix, plot_simulations,
 rule all:
     input:
          EXPERIMENT + '/plot_simulation',
-         EXPERIMENT + '/plot_hyphy'
+         # EXPERIMENT + '/plot_hyphy'
 
 rule cp_simuevol:
     output: EXPERIMENT + '/SimuProfile',

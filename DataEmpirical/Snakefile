@@ -27,7 +27,7 @@ rule filter_ali:
 rule build_batchfile:
     output: EXPERIMENT + '/{experiment}/{model}_run.bf'
     input:
-         exec=ROOT + "/scripts/hyphy_run.py",
+         exec=ROOT + "/scripts/hyphy_build.py",
          fasta=lambda w: "{0}/{1}/alignment{2}.fasta".format(EXPERIMENT, w.experiment, ".ThirdPos" if w.model == "GTR" else ""),
          tree=lambda w: "{0}/{1}/tree.newick".format(EXPERIMENT, w.experiment),
     shell: 'python3 {input.exec} --input {BATCH_PATH} --model {wildcards.model} --fasta {input.fasta} --tree {input.tree} --output {output}'

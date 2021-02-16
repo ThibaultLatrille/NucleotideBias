@@ -59,9 +59,10 @@ if __name__ == '__main__':
 
         if args.model == "MF":
             profile_path = "/".join(batch.split("/")[:-1]) + "_profile.prefs"
-            predicted_array.append(omega_pairwise_from_profile(profile_path, at_gc_pct, 1.0))
+            predicted_array.append(omega_pairwise_from_profile(profile_path, at_gc_pct))
             estimated_array.append(omega_pairwise_from_hyphy(hyphy_dico))
-            plot_pairwise_matrices(predicted_array[-1], estimated_array[-1], "{0}/omega.{1}".format(args.output, at_gc_pct))
+            plot_pairwise_matrices(predicted_array[-1], estimated_array[-1],
+                                   "{0}/omega.{1}".format(args.output, at_gc_pct))
 
         results_dico = {k: v[0] for k, v in pd.read_csv(exp + ".tsv", sep='\t').items()}
         nested_dict["w_obs"][at_gc_pct] = results_dico["dnd0_event_tot"]

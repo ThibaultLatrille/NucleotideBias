@@ -60,7 +60,7 @@ def open_fasta_file(fasta_path):
 def omega_pairwise_from_profile(profile_file, at_over_gc):
     assert (os.path.isfile(profile_file))
     df = pd.read_csv(profile_file, sep=",")
-    profiles = np.power(df.drop('site', axis=1).values)
+    profiles = df.drop('site', axis=1).values
     fitnesses = np.log(profiles)
     inv_profiles = 1.0 / profiles
     nbr_sites = len(profiles)
@@ -86,7 +86,6 @@ def omega_pairwise_from_profile(profile_file, at_over_gc):
                         inv_profiles[site, source] - inv_profiles[site, target])
 
             omega_array[source, target] /= np.sum([z_sites[site] * profiles[site, source] for site in range(nbr_sites)])
-            assert (omega_array[source, target] >= 0.0)
     return omega_array
 
 
