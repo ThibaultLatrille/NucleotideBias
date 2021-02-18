@@ -8,7 +8,8 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input', required=True, type=str, dest="input")
     args = parser.parse_args()
 
-    hyphy_dico = format_hyphy_dico(dico_from_file(args.input))
+    hyphy_dico = dico_from_file(args.input)
+    format_hyphy_dico(hyphy_dico, model="GTR")
     out = {}
     for s in nucleotides:
         for t in nucleotides:

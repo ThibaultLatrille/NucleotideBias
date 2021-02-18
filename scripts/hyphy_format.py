@@ -9,7 +9,7 @@ def dico_from_file(filename):
         for sub_line in line.split(";"):
             split_line = sub_line.split("=")
             if len(split_line) <= 1: continue
-            key = split_line[0].replace("global ", "")
+            key = split_line[0].replace("global ", "").strip()
             if key in tmp_dico: continue
             value = split_line[-1].strip()
             try:
@@ -21,18 +21,21 @@ def dico_from_file(filename):
     return tmp_dico
 
 
-def format_hyphy_dico(hyphy_dico):
+def format_hyphy_dico(hyphy_dico, model):
+    df = {"GTR": 6 + 3, "MG": 6 + 3 + 1, "MF": 6 + 3 + 75 + 19}
+    if model in df.keys() and "Log Likelihood" in hyphy_dico:
+        hyphy_dico["AIC"] = 2 * df[model] - 2 * hyphy_dico["Log Likelihood"]
+
     if "pnCG" in hyphy_dico:
         hyphy_dico["pnC"] = hyphy_dico["pnCG"]
         hyphy_dico["pnG"] = hyphy_dico["pnCG"]
         hyphy_dico["pnA"] = hyphy_dico["pnAT"]
     hyphy_dico["pnT"] = 1 - (hyphy_dico["pnC"] + hyphy_dico["pnG"] + hyphy_dico["pnA"])
 
+    if 'GTR' == model or 'w' in hyphy_dico: return hyphy_dico
+
     if "epsA" in hyphy_dico and "epsM" not in hyphy_dico:
         hyphy_dico["epsM"] = 20 - sum([hyphy_dico["eps" + aa] for aa in amino_acids_set if aa != "M"])
-
-    if 'w' in hyphy_dico:
-        return hyphy_dico
 
     codon_frequencies = np.ones(len(codons))
     for codon_index, codon in enumerate(codons):
@@ -61,7 +64,8 @@ def format_hyphy_dico(hyphy_dico):
             p_fix = 1.0
             beta = "b_" + "".join(sorted((codon_table[codon_origin], codon_table[codon_target])))
             if beta in hyphy_dico:
-                assert (aa_neighbors[aa_char_to_int[codon_table[codon_origin]], aa_char_to_int[codon_table[codon_target]]])
+                assert (
+                    aa_neighbors[aa_char_to_int[codon_table[codon_origin]], aa_char_to_int[codon_table[codon_target]]])
                 if hyphy_dico[beta] > 100.0:
                     print("{0}={1}".format(beta, hyphy_dico[beta]))
                 p_fix *= hyphy_dico[beta]

@@ -47,12 +47,12 @@ for program in ['SimuEvol']:
     diff_git_dir("{0}/{1}".format(ROOT, program), "{0}/{1}".format(EXPERIMENT, program))
 
 localrules: all, cp_simuevol, create_profile, generate_matrix, plot_simulations, simulation, build_batchfile, inference,
-          merge_inference, hyphy_simulated
+          merge_inference
 
 rule all:
     input:
          EXPERIMENT + '/plot_simulation',
-         # EXPERIMENT + '/plot_hyphy'
+         expand(EXPERIMENT + '/{alpha}/{model}_plot', model=config['MODELS'], alpha=alpha_array)
 
 rule cp_simuevol:
     output: EXPERIMENT + '/SimuProfile',
@@ -133,13 +133,5 @@ rule merge_inference:
     input:
          src=ROOT + "/scripts/hyphy_simulated.py",
          infer=expand(EXPERIMENT + '/{{alpha}}/{mut_bias}_{{model}}_run.bf_hyout.txt', mut_bias=mut_bias_array)
-    params:
-         model=lambda w: "--model {0}".format(w.model)
     shell:
-         'mkdir -p {output} && python3 {input.src} {params.model} --trace {input.infer} --output {output}'
-
-rule hyphy_simulated:
-    output: plot=touch(EXPERIMENT + '/plot_hyphy')
-    input: expand(EXPERIMENT + '/{alpha}/{model}_plot', model=config['MODELS'], alpha=alpha_array)
-
-
+         'mkdir -p {output} && python3 {input.src} --model {wildcards.model} --trace {input.infer} --output {output}'

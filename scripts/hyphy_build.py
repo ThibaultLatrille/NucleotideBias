@@ -61,6 +61,7 @@ def build_nuc_vars(nuc_freqs, vars_list, constrains_list):
     ratio = len(values_set) / len(nuc_freqs.values())
 
     for var in values_set:
+        constrains_list.append("{0}:>0;".format(var))
         if var != const_freq:
             vars_list.append("global {0}=0.25;".format(var))
 
@@ -102,6 +103,7 @@ def build_rates(param, vars_list, constrains_list):
                         gtr_vars[key] = value
                         vars_set.add(value)
     vars_list.extend(["global {0}=1.0;".format(v) for v in vars_set])
+    constrains_list.extend(["{0}:>0;".format(v) for v in vars_set])
     return gtr_vars
 
 
@@ -112,7 +114,7 @@ def epsilon_name(codon, omega_param):
     return epsilon
 
 
-def build_nuc_matrices(nuc_freqs, exchan_vars, vars_list, constrains_list):
+def build_nuc_matrices(nuc_freqs, exchan_vars):
     ''' Create MG94-style matrices (use target nucleotide frequencies).  '''
     matrix = '{4, 4, \n'  # MG94
 
@@ -177,8 +179,10 @@ def build_codon_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constra
             constrains_list.append("global {0}:=20-({1});".format(const_epsilon, const_freq_sum))
 
         vars_list.extend(["global {0}=1.0;".format(v) for v in epsilon_set])
+        constrains_list.extend(["{0}:>0;".format(v) for v in epsilon_set])
 
     vars_list.extend(["global {0}=1.0;".format(v) for v in omega_set])
+    constrains_list.extend(["{0}:>0;".format(v) for v in omega_set])
 
     print("{0} omega parameters out of {1:.0f} possible".format(len(omega_set), 20 * 19 / 2))
     constrains_list.append("global z:={0};".format("+".join(freqs)))
@@ -207,11 +211,10 @@ def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infil
 
     nuc_freqs = nuc_freqs_dict[freq_param]
     build_nuc_vars(nuc_freqs_dict[freq_param], vars_list, constrains_list)
-
     exchan_vars = build_rates(rate_param, vars_list, constrains_list)
 
     if omega_param == 0:
-        matrix, freqs = build_nuc_matrices(nuc_freqs, exchan_vars, vars_list, constrains_list)
+        matrix, freqs = build_nuc_matrices(nuc_freqs, exchan_vars)
     else:
         matrix, freqs = build_codon_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constrains_list)
 

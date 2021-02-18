@@ -15,20 +15,23 @@ if __name__ == '__main__':
     out_dico["name"] = args.output.split("/")[-2]
 
     for hyphy_result in args.input:
-        model = hyphy_result.split("/")[-1].split("_")[-2]
+        model = hyphy_result.split("/")[-1].split("_")[0]
         hyphy_dico = dico_from_file(hyphy_result)
-        format_hyphy_dico(hyphy_dico)
-
-        out_dico["w_" + model] = hyphy_dico["w"]
-
-        for subset in subset_list:
-            omega = "w_" + subset
-            if omega in hyphy_dico:
-                out_dico[omega + model] = hyphy_dico[omega]
+        format_hyphy_dico(hyphy_dico, model)
 
         out_dico["lambda_obs_" + model] = equilibrium_lambda(hyphy_dico)
         if ("pnG" in hyphy_dico) and ("pnG" in hyphy_dico):
             gc_pct = (hyphy_dico["pnG"] + hyphy_dico["pnC"])
             out_dico["lambda_" + model] = (1.0 - gc_pct) / gc_pct
+
+        out_dico["AIC_" + model] = hyphy_dico["AIC"]
+
+        if model == "GTR": continue
+        out_dico["w_" + model] = hyphy_dico["w"]
+
+        for subset in subset_list:
+            omega = "w_" + subset
+            if omega in hyphy_dico:
+                out_dico[omega + "_" + model] = hyphy_dico[omega]
 
     pd.DataFrame({k: [v] for k, v in out_dico.items()}).to_csv(args.output, index=False, sep="\t")

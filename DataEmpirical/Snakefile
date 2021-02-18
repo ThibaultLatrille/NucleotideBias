@@ -11,10 +11,12 @@ experiment_array = [i for i in os.listdir(os.path.abspath('.')) if (os.path.isdi
 print(experiment_array)
 models = ["MG", "MF", "GTR"]
 
-localrules: all, filter_ali, build_batchfile, result_inference, merge_results
+localrules: all, filter_ali, build_batchfile, result_inference, merge_results, estimated_matrices
 
 rule all:
-    input: EXPERIMENT + '/merged_results.tsv'
+    input:
+        EXPERIMENT + '/merged_results.tsv',
+        expand(EXPERIMENT + '/{experiment}/matrix_plot.png', experiment=experiment_array)
 
 rule filter_ali:
     output:
@@ -42,6 +44,20 @@ rule run_inference:
          out=EXPERIMENT + '/{experiment}/{model}.stdout',
          err=EXPERIMENT + '/{experiment}/{model}.stderr'
     shell: 'HYPHYMP {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
+
+rule estimated_matrices:
+    output: EXPERIMENT + '/{experiment}/{model}_matrix.tsv'
+    input:
+         exec=ROOT + "/scripts/hyphy_to_matrix.py",
+         bf=EXPERIMENT + '/{experiment}/{model}_run.bf_hyout.txt'
+    shell: 'python3 {input.exec} --input {input.bf} --output {output}'
+
+rule plot_matrices:
+    output: EXPERIMENT + '/{experiment}/matrix_plot.png'
+    input:
+         exec=ROOT + "/scripts/plot_matrices.py",
+         bf=expand(EXPERIMENT + '/{{experiment}}/{model}_matrix.tsv', model=models)
+    shell: 'python3 {input.exec} --input {input.bf} --output {output}'
 
 rule result_inference:
     output: EXPERIMENT + '/{experiment}/results.tsv'

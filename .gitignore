@@ -16,6 +16,8 @@
 /DataSimulated/N_*
 /Data4FoldDegenerate/CDS.*.fasta
 /Data4FoldDegenerate/rootedtree.*.nhx
+/EstimatedMatrices/
+/OrthoMam/singlegene_alignments/
 /notebooks/*
 /*/.snakemake
 *.7z
@@ -37,6 +39,7 @@
 *.bbl
 *.blg
 *.contdiff
+matrix_plot.*
 alignment.ThirdPos.fasta
 tree.extant.newick
 GTR_*

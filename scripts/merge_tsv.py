@@ -2,7 +2,6 @@
 import argparse
 import pandas as pd
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-o', '--output', required=True, type=str, dest="output")
@@ -10,8 +9,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     concat = pd.concat([pd.read_csv(filepath, sep='\t') for filepath in args.input], axis=0, ignore_index=True)
-    concat.to_csv(args.output, sep="\t", index=False)
-    concat.to_latex(args.output.replace(".tsv", '.tex'), index=False)
+    concat.to_csv(args.output, sep="\t", index=False, columns=list(sorted(concat)))
+    concat.to_latex(args.output.replace(".tsv", '.tex'), index=False, columns=list(sorted(concat)))
 
     header = list(concat["name"].values)
     concat.pop("name")

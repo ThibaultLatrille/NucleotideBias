@@ -22,22 +22,29 @@ rule filter_ali:
          exec=ROOT + "/scripts/filter_third_positions.py"
     shell: 'python3 {input.exec} --input {input.ali} --output {output} --tree {input.tree} --ancestral {wildcards.ancestral}'
 
-rule run_inference:
+rule build_batchfile:
     output: EXPERIMENT + '/GTR_{ancestral}_run.bf'
     input:
-         exec=ROOT + "/scripts/hyphy_run.py",
+         exec=ROOT + "/scripts/hyphy_build.py",
          fasta=EXPERIMENT + '/CDS.{ancestral}.fasta'
     params:
-          model=lambda w: "--model GTR",
           tree=lambda w: "--tree {0}/rootedtree.{1}.nhx".format(EXPERIMENT, w.ancestral),
           fasta=lambda w: "--fasta {0}/CDS.{1}.fasta".format(EXPERIMENT, w.ancestral)
-    shell: 'python3 {input.exec} --input {BATCH_PATH} {params.model} {params.fasta} {params.tree} --output {output}'
+    shell: 'python3 {input.exec} --input {BATCH_PATH} --model GTR {params.fasta} {params.tree} --output {output}'
+
+rule run_inference:
+    output: EXPERIMENT + '/GTR_{ancestral}_run.bf_hyout.txt'
+    input: EXPERIMENT + '/GTR_{ancestral}_run.bf'
+    params: time="1-23:00", mem=2000, threads=1
+    log:
+         out=EXPERIMENT + '/GTR_{ancestral}_run.stdout',
+         err=EXPERIMENT + '/GTR_{ancestral}_run.stderr'
+    shell: 'HYPHYMP {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
+
 
 rule analysis:
     output: EXPERIMENT + '/GTR_{ancestral}_matrix.tsv'
     input:
          exec=ROOT + "/scripts/hyphy_to_matrix.py",
-         bf=EXPERIMENT + '/GTR_{ancestral}_run.bf'
-    shell: 'python3 {input.exec} --input {input.bf}_hyout.txt --output {output}'
-
-
+         bf=EXPERIMENT + '/GTR_{ancestral}_run.bf_hyout.txt'
+    shell: 'python3 {input.exec} --input {input.bf} --output {output}'

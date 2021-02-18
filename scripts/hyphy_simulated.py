@@ -55,7 +55,7 @@ if __name__ == '__main__':
         nested_dict["AT/GC_obs"][at_gc_pct] = ali_dico["at_over_gc"]
 
         hyphy_dico = dico_from_file(batch)
-        format_hyphy_dico(hyphy_dico)
+        format_hyphy_dico(hyphy_dico, args.model)
 
         if args.model == "MF":
             profile_path = "/".join(batch.split("/")[:-1]) + "_profile.prefs"
