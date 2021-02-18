@@ -104,6 +104,7 @@ def build_rates(param, vars_list, constrains_list):
                         vars_set.add(value)
     vars_list.extend(["global {0}=1.0;".format(v) for v in vars_set])
     constrains_list.extend(["{0}:>0;".format(v) for v in vars_set])
+    constrains_list.extend(["{0}:<10;".format(v) for v in vars_set])
     return gtr_vars
 
 
@@ -181,9 +182,11 @@ def build_codon_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constra
 
         vars_list.extend(["global {0}=1.0;".format(v) for v in epsilon_set])
         constrains_list.extend(["{0}:>0;".format(v) for v in epsilon_set])
+        constrains_list.extend(["{0}:<20;".format(v) for v in epsilon_set])
 
     vars_list.extend(["global {0}=1.0;".format(v) for v in omega_set])
     constrains_list.extend(["{0}:>0;".format(v) for v in omega_set])
+    constrains_list.extend(["{0}:<10;".format(v) for v in omega_set])
 
     print("{0} omega parameters out of {1:.0f} possible".format(len(omega_set), 20 * 19 / 2))
     constrains_list.append("global z:={0};".format("+".join(freqs)))
@@ -206,7 +209,7 @@ def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infil
     nuc_freqs_dict[3] = {'A': 'pnA', 'C': 'pnC', 'G': 'pnG', 'T': 'pnT'}
 
     vars_list = ["global mu=1;"]
-    constrains_list = ["global mu:>0;"]
+    constrains_list = ["mu:>0;mu:<10;"]
 
     nuc_freqs = nuc_freqs_dict[freq_param]
     build_nuc_vars(nuc_freqs_dict[freq_param], vars_list, constrains_list)

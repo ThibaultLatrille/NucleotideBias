@@ -1,15 +1,15 @@
-MODELS: []
-TREE: DataSimulated/trees/rootedtree.OrthoMam.nhx
+MODELS: [MF, MG]
+TREE: DataSimulated/trees/rootedtree.Primates.nhx
 MUTATION_RATE_PER_GENERATION: 1.0
 PROFILE: DataSimulated/preferences/np.prefs
 EXON_SIZE: 498
 NBR_EXON: 10
 SEED: 42
 ALPHA_ARRAY_MIN: 1
-ALPHA_ARRAY_MAX: 4
-ALPHA_ARRAY_STEPS: 3
-LAMBDA_ARRAY_MIN: 0.2
-LAMBDA_ARRAY_MAX: 5
-LAMBDA_ARRAY_STEPS: 5
+ALPHA_ARRAY_MAX: 2
+ALPHA_ARRAY_STEPS: 2
+LAMBDA_ARRAY_MIN: 0.5
+LAMBDA_ARRAY_MAX: 2
+LAMBDA_ARRAY_STEPS: 32
 NUC_MATRIX: DataSimulated/matrices/nuc_matrix_Simiiformes_MF.tsv
 REPLICATES: 4
