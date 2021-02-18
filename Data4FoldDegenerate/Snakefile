@@ -39,7 +39,7 @@ rule run_inference:
     log:
          out=EXPERIMENT + '/GTR_{ancestral}_run.stdout',
          err=EXPERIMENT + '/GTR_{ancestral}_run.stderr'
-    shell: 'HYPHYMP {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
+    shell: 'hyphy {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
 
 
 rule analysis:

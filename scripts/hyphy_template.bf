@@ -19,11 +19,6 @@ DataSetFilter filt_data = CreateFilter(raw_data,1);
 /* Set up frequencies.  */
 StateFrequencies={{ freqs }};
 
-/* Optimize likelihoods for each frequency specification */
-////////////// {{ param }} //////////////
-{% for var in vars_list %}{{ var }} {% endfor %}
-{% for var in constrains_list %}{{ var }} {% endfor %}
-
 Model StateModel = (StateMatrix, StateFrequencies, 0);
 UseModel (USE_NO_MODEL);
 UseModel(StateModel);

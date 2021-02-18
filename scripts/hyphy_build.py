@@ -16,7 +16,6 @@ from codons import *
 import jinja2
 import argparse
 from ete3 import Tree
-from subprocess import run
 
 
 def write_fasta_file(ali_path, fasta_path):
@@ -61,11 +60,12 @@ def build_nuc_vars(nuc_freqs, vars_list, constrains_list):
     ratio = len(values_set) / len(nuc_freqs.values())
 
     for var in values_set:
-        constrains_list.append("{0}:>0;".format(var))
         if var != const_freq:
             vars_list.append("global {0}=0.25;".format(var))
+            constrains_list.append("{0}:>0;".format(var))
 
     constrains_list.append("global {0}:={1}-({2});".format(const_freq, ratio, const_freq_sum))
+    constrains_list.append("{0}:>0;".format(const_freq))
     return 1
 
 
@@ -177,6 +177,7 @@ def build_codon_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constra
             assert len(epsilon_set) == 19, "There must be 20 amino-acids"
             const_freq_sum = "+".join([var for var in epsilon_set])
             constrains_list.append("global {0}:=20-({1});".format(const_epsilon, const_freq_sum))
+            constrains_list.append("{0}:>0;".format(const_epsilon))
 
         vars_list.extend(["global {0}=1.0;".format(v) for v in epsilon_set])
         constrains_list.extend(["{0}:>0;".format(v) for v in epsilon_set])
@@ -204,10 +205,8 @@ def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infil
     nuc_freqs_dict[1] = {'A': 'pnAT', 'C': 'pnCG', 'G': 'pnCG', 'T': 'pnAT'}
     nuc_freqs_dict[3] = {'A': 'pnA', 'C': 'pnC', 'G': 'pnG', 'T': 'pnT'}
 
-    vars_list = list()
-    constrains_list = list()
-
-    vars_list.append("global mu=1;")
+    vars_list = ["global mu=1;"]
+    constrains_list = ["global mu:>0;"]
 
     nuc_freqs = nuc_freqs_dict[freq_param]
     build_nuc_vars(nuc_freqs_dict[freq_param], vars_list, constrains_list)
