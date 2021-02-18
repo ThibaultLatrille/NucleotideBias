@@ -37,9 +37,9 @@ SIMULATION_PARAMS += ' --fix_gen_time'
 if MUTATION_MATRIX:
     mut_bias_array = list(range(1, config['REPLICATES'] + 1))
 else:
-    mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(config['LAMBDA_ARRAY_LOG10_MIN'], config['LAMBDA_ARRAY_LOG10_MAX'], config['LAMBDA_ARRAY_STEPS'])]
+    mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(np.log10(config['LAMBDA_ARRAY_MIN']), np.log10(config['LAMBDA_ARRAY_MAX']), config['LAMBDA_ARRAY_STEPS'])]
 
-alpha_array = ["{0:3f}".format(i) for i in np.logspace(config['ALPHA_ARRAY_LOG10_MIN'], config['ALPHA_ARRAY_LOG10_MAX'], config['ALPHA_ARRAY_STEPS'])]
+alpha_array = ["{0:3f}".format(i) for i in np.logspace(np.log10(config['ALPHA_ARRAY_MIN']), np.log10(config['ALPHA_ARRAY_MAX']), config['ALPHA_ARRAY_STEPS'])]
 for alpha in alpha_array:
     os.makedirs(EXPERIMENT + "/" + alpha, exist_ok=True)
 

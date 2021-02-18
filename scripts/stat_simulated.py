@@ -32,6 +32,7 @@ def compute_diversity(frequencies_seq):
 
 
 def open_ali_file(ali_path):
+    assert (os.path.isfile(ali_path))
     species_list, ali_list = [], []
     with open(ali_path, 'r') as ali_file:
         next(ali_file)
