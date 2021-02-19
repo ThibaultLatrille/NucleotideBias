@@ -123,7 +123,7 @@ rule run_inference:
     log:
          out=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stdout',
          err=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stderr'
-    shell: 'hyphy -d {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
+    shell: 'hyphy {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
 
 rule inference:
     input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt', mut_bias=mut_bias_array, model=config['MODELS'], alpha=alpha_array)
