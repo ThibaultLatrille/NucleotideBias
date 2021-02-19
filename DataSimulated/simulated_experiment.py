@@ -9,7 +9,7 @@ def create_experiment(config, screen, sbatch, nbr_cpu):
     exp_path = os.getcwd() + '/Experiments/' + experiment
 
     os.makedirs(exp_path, exist_ok=True)
-    os.system('cp {0} {1}'.format(config, exp_path))
+    os.system('cp {0} {1}/config.yaml'.format(config, exp_path))
     os.remove(exp_path + "/Snakefile") if os.path.exists(exp_path + "/Snakefile") else None
     os.symlink(os.getcwd() + "/Snakefile", exp_path + "/Snakefile")
     run_file = exp_path + "/snakeslurm.sh"

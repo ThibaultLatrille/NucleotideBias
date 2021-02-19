@@ -14,6 +14,19 @@ def plot_pairwise_matrices(predicted, estimated, output):
     fig.colorbar(axs[1].imshow(estimated), ax=axs[1], orientation='horizontal', fraction=.1)
     axs[1].set_title('$\\widehat{\\omega}$ estimated between pairs of amino-acids')
 
+    for index in [0, 1]:
+        # We want to show all ticks...
+        axs[index].set_xticks(np.arange(len(amino_acids)))
+        axs[index].set_yticks(np.arange(len(amino_acids)))
+        # ... and label them with the respective list entries
+        axs[index].set_xticklabels(amino_acids)
+        axs[index].set_yticklabels(amino_acids)
+        # Loop over data dimensions and create text annotations.
+        for i in range(len(amino_acids)):
+            for j in range(len(amino_acids)):
+                text = axs[index].text(j, i, "{0:.2f}".format(predicted[i, j] if index == 0 else estimated[i, j]),
+                                       ha="center", va="center", color="w")
+
     filt = np.logical_and(np.isfinite(predicted) & np.isfinite(estimated), estimated > 0)
     x = predicted[filt].flatten()
     y = estimated[filt].flatten()
