@@ -51,7 +51,7 @@ def array_to_hyphy_freq(f):
     return hyphy_f
 
 
-def build_nuc_vars(nuc_freqs, vars_list, constrains_list):
+def build_nuc_freq_constrains(nuc_freqs, vars_list, constrains_list):
     ''' Compute codon frequencies from GTR nucleotide frequencies. '''
     const_freq = nuc_freqs['T']
     values_set = set(nuc_freqs.values())
@@ -87,24 +87,27 @@ def is_TI(source, target):
         return False
 
 
-def build_rates(param, vars_list, constrains_list):
+def build_nuc_rates(param, vars_list, constrains_list, nuc_freqs):
+    if param == 0: return {}
+    assert param == 5
     vars_set = set()
-    assert param in [0, 1, 5]
     gtr_vars = {}
+    norm_list = []
     for n_1 in nucindex.keys():
         for n_2 in nucindex.keys():
             if n_1 != n_2:
-                key = n_1 + n_2
-                if param == 1 and is_TI(n_1, n_2):
-                    gtr_vars[key] = "k"
-                if param == 5:
-                    value = "exch" + "".join(sorted(n_1 + n_2))
-                    if value != 'exchAC':
-                        gtr_vars[key] = value
-                        vars_set.add(value)
-    vars_list.extend(["global {0}=1.0;".format(v) for v in vars_set])
+                value = "exch" + "".join(sorted(n_1 + n_2))
+                gtr_vars[n_1 + n_2] = value
+                if value != "exchAC":
+                    vars_set.add(value)
+                    if n_2 > n_1:
+                        norm_list.append("{0}*{1}*{2}".format(nuc_freqs[n_1], value, nuc_freqs[n_2]))
+    vars_list.extend(["global {0}=1.333;".format(v) for v in vars_set])
     constrains_list.extend(["{0}:>0;".format(v) for v in vars_set])
-    constrains_list.extend(["{0}:<10;".format(v) for v in vars_set])
+    if len(norm_list) > 1:
+        constrains_list.append("global exchAC:=(1 - 2*({0}))/(2*{1}*{2});".format("+".join(norm_list), nuc_freqs["A"],
+                                                                                  nuc_freqs["C"]))
+        constrains_list.append("exchAC:>0;")
     return gtr_vars
 
 
@@ -212,8 +215,8 @@ def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infil
     constrains_list = ["mu:>0;mu:<10;"]
 
     nuc_freqs = nuc_freqs_dict[freq_param]
-    build_nuc_vars(nuc_freqs_dict[freq_param], vars_list, constrains_list)
-    exchan_vars = build_rates(rate_param, vars_list, constrains_list)
+    build_nuc_freq_constrains(nuc_freqs, vars_list, constrains_list)
+    exchan_vars = build_nuc_rates(rate_param, vars_list, constrains_list, nuc_freqs)
 
     if omega_param == 0:
         matrix, freqs = build_nuc_matrices(nuc_freqs, exchan_vars)
