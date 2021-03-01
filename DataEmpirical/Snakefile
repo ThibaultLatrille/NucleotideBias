@@ -34,6 +34,9 @@ rule build_batchfile:
          tree=lambda w: "{0}/{1}/tree.newick".format(EXPERIMENT, w.experiment),
     shell: 'python3 {input.exec} --input {BATCH_PATH} --model {wildcards.model} --fasta {input.fasta} --tree {input.tree} --output {output}'
 
+rule build:
+    input: expand(EXPERIMENT + '/{experiment}/{model}_run.bf', experiment=experiment_array, model=models)
+
 
 rule run_inference:
     output: EXPERIMENT + '/{experiment}/{model}_run.bf_hyout.txt'
@@ -44,6 +47,10 @@ rule run_inference:
          out=EXPERIMENT + '/{experiment}/{model}.stdout',
          err=EXPERIMENT + '/{experiment}/{model}.stderr'
     shell: 'hyphy {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
+
+rule inference:
+    input: expand(EXPERIMENT + '/{experiment}/{model}_run.bf_hyout.txt', experiment=experiment_array, model=models)
+
 
 rule estimated_matrices:
     output: EXPERIMENT + '/{experiment}/{model}_matrix.tsv'

@@ -211,8 +211,7 @@ def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infil
     nuc_freqs_dict[1] = {'A': 'pnAT', 'C': 'pnCG', 'G': 'pnCG', 'T': 'pnAT'}
     nuc_freqs_dict[3] = {'A': 'pnA', 'C': 'pnC', 'G': 'pnG', 'T': 'pnT'}
 
-    vars_list = ["global mu=1;"]
-    constrains_list = ["mu:>0;mu:<10;"]
+    vars_list, constrains_list = [], []
 
     nuc_freqs = nuc_freqs_dict[freq_param]
     build_nuc_freq_constrains(nuc_freqs, vars_list, constrains_list)

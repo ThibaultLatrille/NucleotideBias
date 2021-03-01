@@ -24,6 +24,7 @@ def dico_from_file(filename):
 def format_hyphy_dico(hyphy_dico, model):
     df = {"GTR": 6 + 3, "MG": 6 + 3 + 1, "MF": 6 + 3 + 75 + 19}
     if model in df.keys() and "Log Likelihood" in hyphy_dico:
+        hyphy_dico["df"] = df[model]
         hyphy_dico["AIC"] = 2 * df[model] - 2 * hyphy_dico["Log Likelihood"]
 
     if "pnCG" in hyphy_dico:
@@ -32,7 +33,8 @@ def format_hyphy_dico(hyphy_dico, model):
         hyphy_dico["pnA"] = hyphy_dico["pnAT"]
     hyphy_dico["pnT"] = 1 - (hyphy_dico["pnC"] + hyphy_dico["pnG"] + hyphy_dico["pnA"])
 
-    if 'GTR' == model or 'w' in hyphy_dico: return hyphy_dico
+    if model in ["GTR", "MG"]:
+        return hyphy_dico
 
     if "epsA" in hyphy_dico and "epsM" not in hyphy_dico:
         hyphy_dico["epsM"] = 20 - sum([hyphy_dico["eps" + aa] for aa in amino_acids_set if aa != "M"])
@@ -70,10 +72,6 @@ def format_hyphy_dico(hyphy_dico, model):
                     print("{0}={1}".format(beta, hyphy_dico[beta]))
                 p_fix *= hyphy_dico[beta]
 
-            omega_subset = "w_" + weak_strong(nuc_origin) + weak_strong(nuc_target)
-            if omega_subset in hyphy_dico:
-                p_fix *= hyphy_dico[omega_subset]
-
             epsilon = "eps" + codon_table[codon_target]
             if epsilon in hyphy_dico:
                 p_fix *= hyphy_dico[epsilon]
@@ -81,13 +79,13 @@ def format_hyphy_dico(hyphy_dico, model):
             d += mut_flow_tmp * p_fix
             d0 += mut_flow_tmp
 
-            if omega_subset not in hyphy_dico:
-                d_dict[omega_subset] += mut_flow_tmp * p_fix
-                d0_dict[omega_subset] += mut_flow_tmp
+            omega_subset = "w_" + weak_strong(nuc_origin) + weak_strong(nuc_target)
+            d_dict[omega_subset] += mut_flow_tmp * p_fix
+            d0_dict[omega_subset] += mut_flow_tmp
 
     hyphy_dico["w"] = d / d0
     for omega_subset in d_dict.keys():
-        if d_dict[omega_subset] != 0.0 and (omega_subset not in hyphy_dico):
+        if d_dict[omega_subset] != 0.0:
             hyphy_dico[omega_subset] = d_dict[omega_subset] / d0_dict[omega_subset]
 
     return hyphy_dico

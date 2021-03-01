@@ -25,6 +25,8 @@ if __name__ == '__main__':
             out_dico["lambda_" + model] = (1.0 - gc_pct) / gc_pct
 
         out_dico["AIC_" + model] = hyphy_dico["AIC"]
+        out_dico["LnL_" + model] = hyphy_dico["Log Likelihood"]
+        out_dico["df_" + model] = hyphy_dico["df"]
 
         if model == "GTR": continue
         out_dico["w_" + model] = hyphy_dico["w"]

@@ -28,7 +28,7 @@ git clone https://github.com/ThibaultLatrille/SimuEvol && cd SimuEvol && make re
 Install python3 packages
 ```
 sudo apt install -qq -y python3-dev python3-pip
-pip3 install jupyterlab snakemake numpy matplotlib pandas ete3 --user
+pip3 install jinja2 jupyterlab snakemake numpy matplotlib pandas ete3 statsmodels --user
 ```
 Install Hyphy from http://hyphy.org/installation/ using `miniconda`
 ```

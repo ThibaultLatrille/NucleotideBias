@@ -47,7 +47,7 @@ for program in ['SimuEvol']:
     diff_git_dir("{0}/{1}".format(ROOT, program), "{0}/{1}".format(EXPERIMENT, program))
 
 localrules: all, cp_simuevol, create_profile, generate_matrix, plot_simulations, simulation, build_batchfile, inference,
-          merge_inference
+          merge_inference, build, filter_ali
 
 rule all:
     input:
@@ -105,15 +105,26 @@ rule plot_simulations:
 rule simulation:
     input: EXPERIMENT + '/plot_simulation'
 
+rule filter_ali:
+    output:
+         EXPERIMENT + '/{alpha}/{mut_bias}_exp.ThirdPos.fasta'
+    input:
+         ali=EXPERIMENT + '/{alpha}/{mut_bias}_exp',
+         exec=ROOT + "/scripts/filter_third_positions.py"
+    shell: 'python3 {input.exec} --input {input.ali}.ali --output {output}'
+
 rule build_batchfile:
     output: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf'
     input:
          exec=ROOT + "/scripts/hyphy_build.py",
-         exp=rules.run_simulation.output
+         fasta=lambda w: EXPERIMENT + '/{alpha}/{mut_bias}_exp' + (".ThirdPos.fasta" if w.model == "GTR" else "")
     params:
           time="1-23:00", mem=2000, threads=1,
-          model=lambda w: "--model {0}".format(w.model)
-    shell: 'python3 {input.exec} --input {BATCH_PATH} --fasta {input.exp}.ali {params.model} --tree {NEWICK_PATH} --output {output}'
+          ext=lambda w: "" if w.model == "GTR" else ".ali"
+    shell: 'python3 {input.exec} --input {BATCH_PATH} --fasta {input.fasta}{params.ext} --model {wildcards.model} --tree {NEWICK_PATH} --output {output}'
+
+rule build:
+    input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf', mut_bias=mut_bias_array, model=config['MODELS'], alpha=alpha_array)
 
 rule run_inference:
     output: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt'
@@ -123,7 +134,7 @@ rule run_inference:
     log:
          out=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stdout',
          err=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stderr'
-    shell: 'hyphy {input} CPU={params.threads} 2> {log.err} 1> {log.out}'
+    shell: 'hyphy {input} 2> {log.err} 1> {log.out}'
 
 rule inference:
     input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt', mut_bias=mut_bias_array, model=config['MODELS'], alpha=alpha_array)
@@ -134,4 +145,4 @@ rule merge_inference:
          src=ROOT + "/scripts/hyphy_simulated.py",
          infer=expand(EXPERIMENT + '/{{alpha}}/{mut_bias}_{{model}}_run.bf_hyout.txt', mut_bias=mut_bias_array)
     shell:
-         'mkdir -p {output} && python3 {input.src} --model {wildcards.model} --trace {input.infer} --output {output}'
+         'mkdir -p {output} && python3 {input.src} --model {wildcards.model} --trace {input.infer} --mutation_matrix {MUTATION_MATRIX} --output {output}'

@@ -39,7 +39,6 @@ def open_ali_file(ali_path):
         for line in ali_file:
             if line != "\n":
                 spe, seq = line.replace("  ", " ").replace("\t", " ").replace("\n", "").split(" ")
-                assert len(seq) % 3 == 0
                 ali_list.append(seq)
                 species_list.append(spe)
     return species_list, ali_list
@@ -51,14 +50,13 @@ def open_fasta_file(fasta_path):
         for seq_unstriped in fasta_file:
             if seq_unstriped[0] != ">":
                 seq = seq_unstriped.strip().replace("\n", "")
-                assert len(seq) % 3 == 0
                 ali_list.append(seq)
             else:
                 species_list.append(seq_unstriped.replace(">", ""))
     return species_list, ali_list
 
 
-def omega_pairwise_from_profile(profile_file, at_over_gc):
+def omega_pairwise_from_profile(profile_file, nuc_freqs):
     assert (os.path.isfile(profile_file))
     df = pd.read_csv(profile_file, sep=",")
     profiles = df.drop('site', axis=1).values
@@ -69,7 +67,7 @@ def omega_pairwise_from_profile(profile_file, at_over_gc):
     for site in range(nbr_sites):
         for codon_index, codon in enumerate(codons):
             for nuc in codon:
-                codon_frequencies[site, codon_index] *= (at_over_gc if nuc in weak_nucleotides else 1.0)
+                codon_frequencies[site, codon_index] *= nuc_freqs[nucindex[nuc]]
             codon_frequencies[site, codon_index] *= profiles[site, aa_char_to_int[codon_table[codon]]]
 
     z_sites = 1.0 / codon_frequencies.sum(axis=1)
@@ -83,8 +81,13 @@ def omega_pairwise_from_profile(profile_file, at_over_gc):
 
             omega_array[source, target] = 0.0
             for site in range(nbr_sites):
-                omega_array[source, target] += z_sites[site] * (fitnesses[site, target] - fitnesses[site, source]) / (
-                        inv_profiles[site, source] - inv_profiles[site, target])
+                if abs(fitnesses[site, target] - fitnesses[site, source]) < 1e-3:
+                    omega_array[source, target] += z_sites[site] * (
+                                1 + fitnesses[site, target] - fitnesses[site, source])
+                else:
+                    omega_array[source, target] += z_sites[site] * (
+                                fitnesses[site, target] - fitnesses[site, source]) / (
+                                                           inv_profiles[site, source] - inv_profiles[site, target])
 
             omega_array[source, target] /= np.sum([z_sites[site] * profiles[site, source] for site in range(nbr_sites)])
     return omega_array
@@ -93,10 +96,13 @@ def omega_pairwise_from_profile(profile_file, at_over_gc):
 def stats_from_ali(alignment):
     out_dico = {}
     assert (len(set([len(s) for s in alignment])) == 1)
-    nbr_sites = int(len(alignment[0]) / 3)
+
     concat = "".join(alignment)
     count = Counter(concat)
     out_dico["at_over_gc"] = (count["A"] + count["T"]) / (count["C"] + count["G"])
+
+    nbr_sites = int(len(alignment[0]) / 3)
+    if nbr_sites % 3 != 0: return out_dico
     for pos in range(0, 3):
         count = Counter(concat[pos::3])
         out_dico["at_over_gc_{0}".format(pos + 1)] = (count["A"] + count["T"]) / (count["C"] + count["G"])
@@ -120,15 +126,15 @@ def y_label(p):
     elif "diversity" in p:
         return "D"
     elif "omega_WS_over_SW" in p:
-        return "$\\nu_{\\mathrm{AT} \\rightarrow \\mathrm{GC}} / \\nu_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
+        return "$\\phi_{\\mathrm{AT} \\rightarrow \\mathrm{GC}} / \\phi_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
     elif "omega_SW_over_WS" in p:
-        return "$\\nu_{\\mathrm{GC} \\rightarrow \\mathrm{AT}} / \\nu_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
+        return "$\\phi_{\\mathrm{GC} \\rightarrow \\mathrm{AT}} / \\phi_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
     elif "omega_WS" in p:
-        return "$\\nu_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
+        return "$\\phi_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
     elif "omega_SW" in p:
-        return "$\\nu_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
+        return "$\\phi_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
     elif "omega" in p:
-        return "$\\nu$"
+        return "$\\phi$"
     else:
         return p
 
@@ -180,22 +186,27 @@ if __name__ == '__main__':
     x_range, y_range = sorted(x_range), sorted(y_range)
     dico_params.pop("NbrSites")
     dico_params.pop("NbrTaxa")
-    plt.figure()
 
     for param, dico_values in dico_params.items():
+        fig, ax = plt.subplots()
         for y in y_range:
-            plt.plot(x_range, [dico_values[(x, y)] for x in x_range], linewidth=2, label="$\\alpha={0:.3g}$".format(y))
-        plt.xscale("log")
-        plt.xlabel("$\\lambda$", size=font_size)
-        plt.ylabel(y_label(param), size=font_size)
-        plt.title(title(param), size=font_size * 1.2)
+            label = "$N_{\\mathrm{r}}" + "={0:.3g}".format(y) + "$"
+            ax.plot(x_range, [dico_values[(x, y)] for x in x_range], linewidth=2, label=label)
+        ax.set_xscale("log")
+        ax.set_xticks([0.2, 1, 5])
+        ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.set_xlabel("$\\lambda$", size=font_size)
+        ax.set_ylabel(y_label(param), size=font_size)
+        ax.set_title(title(param), size=font_size * 1.2)
         if "_aa" in param:
-            plt.ylim((1, 20))
+            ax.set_ylim((1, 20))
         elif ("omega" in param) and ("over" not in param):
-            plt.ylim((0, 1))
+            ax.set_ylim((0, 1))
         elif "at_over_gc" in param:
-            plt.yscale("log")
-        plt.legend(loc='upper left', fontsize=legend_size)
+            ax.set_yscale("log")
+            ax.set_yticks([0.2, 1, 5])
+            ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.legend(loc='upper left', fontsize=legend_size)
         plt.xticks(fontsize=legend_size)
         plt.yticks(fontsize=legend_size)
         plt.tight_layout()

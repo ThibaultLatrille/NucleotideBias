@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-for EXPERIMENT in ./DataSimulated/Experiments/Primates*; do
+for EXPERIMENT in DataSimulated/Experiments/PrimatesRep*; do
   NAME=$(basename "${EXPERIMENT}")
   echo "${NAME}"
-  rm -rf ${EXPERIMENT}/Snakefile
-  ln -s $(pwd)/DataSimulated/Snakefile ${EXPERIMENT}
   cd ${EXPERIMENT}
   snakemake --unlock
-  snakemake --touch inference
-  snakemake --printshellcmds --rerun-incomplete -j 4
+  snakemake --printshellcmds --rerun-incomplete -j 8
   cd ../../..
 done
+cd DataEmpirical
+snakemake --printshellcmds --rerun-incomplete -j 8

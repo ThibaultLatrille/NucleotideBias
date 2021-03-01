@@ -4,6 +4,9 @@ Hyphy inference for an "experimental" dataset
 {% for var in vars_list %}{{ var }} {% endfor %}
 {% for var in constrains_list %}{{ var }} {% endfor %}
 
+RANDOM_STARTING_PERTURBATIONS = 1;
+OPTIMIZATION_PRECISION = 0.000001;
+
 StateMatrix={{ matrix }};
 
 /* Read in the data */
@@ -29,7 +32,7 @@ branchLengths	= BranchLength (Tree_newick, -1);
 
 for (k = 0; k < Columns(branchNames)-1; k=k+1)
 {
-	ExecuteCommands("Tree_newick." + branchNames[k] + ".t:=" + branchLengths[k] + ";");
+	ExecuteCommands("Tree_newick." + branchNames[k] + ".t=" + branchLengths[k] + ";");
 }
 
 LikelihoodFunction  LikStateModel = (filt_data, Tree_newick);
