@@ -4,9 +4,6 @@ Hyphy inference for an "experimental" dataset
 {% for var in vars_list %}{{ var }} {% endfor %}
 {% for var in constrains_list %}{{ var }} {% endfor %}
 
-RANDOM_STARTING_PERTURBATIONS = 1;
-OPTIMIZATION_PRECISION = 0.000001;
-
 StateMatrix={{ matrix }};
 
 /* Read in the data */

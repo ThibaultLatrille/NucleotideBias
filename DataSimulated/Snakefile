@@ -35,9 +35,11 @@ SIMULATION_PARAMS += ' --fix_mut_rate'
 SIMULATION_PARAMS += ' --fix_gen_time'
 
 if MUTATION_MATRIX:
-    mut_bias_array = list(range(1, config['REPLICATES'] + 1))
+    mut_bias_array = ["None"]
 else:
     mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(np.log10(config['LAMBDA_ARRAY_MIN']), np.log10(config['LAMBDA_ARRAY_MAX']), config['LAMBDA_ARRAY_STEPS'])]
+
+replicates_array = list(range(1, config['REPLICATES'] + 1))
 
 alpha_array = ["{0:3f}".format(i) for i in np.logspace(np.log10(config['ALPHA_ARRAY_MIN']), np.log10(config['ALPHA_ARRAY_MAX']), config['ALPHA_ARRAY_STEPS'])]
 for alpha in alpha_array:
@@ -81,7 +83,7 @@ rule generate_matrix:
     shell: 'python3 {input.exec} {params.mut_bias} --output {output}'
 
 rule run_simulation:
-    output: touch(EXPERIMENT + '/{alpha}/{mut_bias}_exp')
+    output: touch(EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_exp')
     input:
          exec=rules.cp_simuevol.output,
          prefs=rules.create_profile.output,
@@ -89,17 +91,17 @@ rule run_simulation:
     params:
          time="0-4:00", mem=1000, threads=1,
          seed=lambda w: int(w.mut_bias) * 10**3 if MUTATION_MATRIX else SEED
-    benchmark: EXPERIMENT + "/benchmarks/exp_{alpha}_{mut_bias}.tsv"
+    benchmark: EXPERIMENT + "/benchmarks/exp_{alpha}_{mut_bias}_{replicates}.tsv"
     log:
-        out=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}.stdout',
-        err=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}.stderr'
+        out=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}_{replicates}.stdout',
+        err=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}_{replicates}.stderr'
     shell: '{input.exec} {SIMULATION_PARAMS} --seed {params.seed} --nuc_matrix {input.matrix} --preferences {input.prefs} --output {output} 2> {log.err} 1> {log.out}'
 
 rule plot_simulations:
     output: directory(EXPERIMENT + '/plot_simulation')
     input:
          src=ROOT + "/scripts/stat_simulated.py",
-         exp=expand(rules.run_simulation.output, alpha=alpha_array, mut_bias=mut_bias_array)
+         exp=expand(rules.run_simulation.output, alpha=alpha_array, mut_bias=mut_bias_array, replicates=replicates_array)
     shell: 'mkdir -p {output} && python3 {input.src} --input {input.exp} --output {output}'
 
 rule simulation:
@@ -107,42 +109,42 @@ rule simulation:
 
 rule filter_ali:
     output:
-         EXPERIMENT + '/{alpha}/{mut_bias}_exp.ThirdPos.fasta'
+         EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_exp.ThirdPos.fasta'
     input:
-         ali=EXPERIMENT + '/{alpha}/{mut_bias}_exp',
+         ali=EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_exp',
          exec=ROOT + "/scripts/filter_third_positions.py"
     shell: 'python3 {input.exec} --input {input.ali}.ali --output {output}'
 
 rule build_batchfile:
-    output: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf'
+    output: EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_{model}_run.bf'
     input:
          exec=ROOT + "/scripts/hyphy_build.py",
-         fasta=lambda w: EXPERIMENT + '/{alpha}/{mut_bias}_exp' + (".ThirdPos.fasta" if w.model == "GTR" else "")
+         fasta=lambda w: EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_exp' + (".ThirdPos.fasta" if w.model == "GTR" else "")
     params:
           time="1-23:00", mem=2000, threads=1,
           ext=lambda w: "" if w.model == "GTR" else ".ali"
     shell: 'python3 {input.exec} --input {BATCH_PATH} --fasta {input.fasta}{params.ext} --model {wildcards.model} --tree {NEWICK_PATH} --output {output}'
 
 rule build:
-    input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf', mut_bias=mut_bias_array, model=config['MODELS'], alpha=alpha_array)
+    input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_{model}_run.bf', mut_bias=mut_bias_array, replicates=replicates_array, model=config['MODELS'], alpha=alpha_array)
 
 rule run_inference:
-    output: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt'
-    input: EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf'
+    output: EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_{model}_run.bf_hyout.txt'
+    input: EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_{model}_run.bf'
     params: time="1-23:00", mem=2000, threads=1
-    benchmark: EXPERIMENT + "/benchmarks/inference.{alpha}_{mut_bias}_{model}_run.tsv"
+    benchmark: EXPERIMENT + "/benchmarks/inference.{alpha}_{mut_bias}_{replicates}_{model}_run.tsv"
     log:
-         out=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stdout',
-         err=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{model}.stderr'
+         out=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{replicates}_{model}.stdout',
+         err=EXPERIMENT + '/std/hyphy_{alpha}_{mut_bias}_{replicates}_{model}.stderr'
     shell: 'hyphy {input} 2> {log.err} 1> {log.out}'
 
 rule inference:
-    input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{model}_run.bf_hyout.txt', mut_bias=mut_bias_array, model=config['MODELS'], alpha=alpha_array)
+    input: expand(EXPERIMENT + '/{alpha}/{mut_bias}_{replicates}_{model}_run.bf_hyout.txt', mut_bias=mut_bias_array, replicates=replicates_array, model=config['MODELS'], alpha=alpha_array)
 
 rule merge_inference:
     output: directory(EXPERIMENT + '/{alpha}/{model}_plot')
     input:
          src=ROOT + "/scripts/hyphy_simulated.py",
-         infer=expand(EXPERIMENT + '/{{alpha}}/{mut_bias}_{{model}}_run.bf_hyout.txt', mut_bias=mut_bias_array)
+         infer=expand(EXPERIMENT + '/{{alpha}}/{mut_bias}_{replicates}_{{model}}_run.bf_hyout.txt', mut_bias=mut_bias_array, replicates=replicates_array)
     shell:
          'mkdir -p {output} && python3 {input.src} --model {wildcards.model} --trace {input.infer} --mutation_matrix {MUTATION_MATRIX} --output {output}'

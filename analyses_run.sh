@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-CPU=8
+CPU=32
 cd DataSimulated
 for EXPERIMENT in *.yaml; do
   python3 simulated_experiment.py -c ${EXPERIMENT} -j ${CPU}

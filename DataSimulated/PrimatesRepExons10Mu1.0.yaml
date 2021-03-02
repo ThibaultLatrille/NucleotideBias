@@ -1,12 +1,12 @@
-MODELS: [MF]
+MODELS: [MF, MG]
 TREE: DataSimulated/trees/rootedtree.Primates.nhx
 MUTATION_RATE_PER_GENERATION: 1.0
 PROFILE: DataSimulated/preferences/np.prefs
 EXON_SIZE: 498
 NBR_EXON: 10
 SEED: 42
-ALPHA_ARRAY_MIN: 1
-ALPHA_ARRAY_MAX: 4
-ALPHA_ARRAY_STEPS: 3
+ALPHA_ARRAY_MIN: 2
+ALPHA_ARRAY_MAX: 2
+ALPHA_ARRAY_STEPS: 1
 NUC_MATRIX: DataSimulated/matrices/nuc_matrix_Simiiformes_MF.tsv
-REPLICATES: 12
+REPLICATES: 100

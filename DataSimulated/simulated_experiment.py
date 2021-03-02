@@ -22,7 +22,7 @@ def create_experiment(config, screen, sbatch, nbr_cpu):
             run_str += " --constraint='haswell|skylake|broadwell'"
             run_str += ' --cpus-per-task={params.threads} --mem={params.mem} -t {params.time}"\n'
         else:
-            run_str += "-j {0} --printshellcmds".format(nbr_cpu)
+            run_str += "-j {0} --printshellcmds -k".format(nbr_cpu)
         w.write(run_str)
     os.system("chmod 755 " + run_file)
     cmd = 'cd ' + exp_path + ' && ./snakeslurm.sh'
