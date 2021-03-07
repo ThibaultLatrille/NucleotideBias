@@ -5,7 +5,7 @@ import os
 from collections import Counter
 from hyphy_format import *
 from plot_module import *
-from codons import amino_acids
+from glob import glob
 
 
 def simpson_diversity(frequencies):
@@ -83,10 +83,10 @@ def omega_pairwise_from_profile(profile_file, nuc_freqs):
             for site in range(nbr_sites):
                 if abs(fitnesses[site, target] - fitnesses[site, source]) < 1e-3:
                     omega_array[source, target] += z_sites[site] * (
-                                1 + fitnesses[site, target] - fitnesses[site, source])
+                            1 + fitnesses[site, target] - fitnesses[site, source])
                 else:
                     omega_array[source, target] += z_sites[site] * (
-                                fitnesses[site, target] - fitnesses[site, source]) / (
+                            fitnesses[site, target] - fitnesses[site, source]) / (
                                                            inv_profiles[site, source] - inv_profiles[site, target])
 
             omega_array[source, target] /= np.sum([z_sites[site] * profiles[site, source] for site in range(nbr_sites)])
@@ -101,28 +101,30 @@ def stats_from_ali(alignment):
     count = Counter(concat)
     out_dico["at_over_gc"] = (count["A"] + count["T"]) / (count["C"] + count["G"])
 
-    nbr_sites = int(len(alignment[0]) / 3)
+    nbr_sites = len(alignment[0])
+    out_dico["NbrSites"] = nbr_sites
+    out_dico["NbrTaxa"] = len(alignment)
     if nbr_sites % 3 != 0: return out_dico
     for pos in range(0, 3):
         count = Counter(concat[pos::3])
         out_dico["at_over_gc_{0}".format(pos + 1)] = (count["A"] + count["T"]) / (count["C"] + count["G"])
-    out_dico["NbrSites"] = nbr_sites
-    out_dico["NbrTaxa"] = len(alignment)
 
-    aa_freqs = np.zeros((nbr_sites, len(amino_acids)))
-    for site in range(nbr_sites):
+    '''
+    aa_freqs = np.zeros((int(nbr_sites/3), len(amino_acids)))
+    for site in range(int(nbr_sites/3)):
         count = Counter("".join(codon_table[s[site * 3:(site + 1) * 3]] for s in alignment))
         for aa in amino_acids:
             aa_freqs[site, aa_char_to_int[aa]] = count[aa]
     aa_freqs /= len(alignment)
 
     out_dico["site_diversity_aa"], out_dico["diversity_aa"] = compute_diversity(aa_freqs)
+    '''
     return out_dico
 
 
 def y_label(p):
     if "at_over_gc" in p:
-        return 'AT/GC'
+        return '%AT/%GC'
     elif "diversity" in p:
         return "D"
     elif "omega_WS_over_SW" in p:
@@ -164,47 +166,45 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input', required=True, type=str, nargs='+', dest="input")
     args = parser.parse_args()
 
-    dico_params = {"omega": {}, "omega_WS": {}, "omega_SW": {}, "omega_SW_over_WS": {}, "omega_WS_over_SW": {}}
+    dico_params = defaultdict(lambda: defaultdict(lambda: list()))
     x_range, y_range = set(), set()
     for filepath in args.input:
-        if not os.path.isfile(filepath): continue
         f_slash = filepath.split("/")
-        x, y = float(f_slash[-1].split("_")[-2]), float(f_slash[-2])
+        x, y = float(f_slash[-1]), float(f_slash[-2])
         x_range.add(x)
         y_range.add(y)
-        species, alignment = open_ali_file(filepath + ".ali")
-        for param, val in stats_from_ali(alignment).items():
-            if param not in dico_params: dico_params[param] = dict()
-            dico_params[param][(x, y)] = val
-        results_dico = {k: v[0] for k, v in pd.read_csv(filepath + ".tsv", sep='\t').items()}
-        dico_params["omega"][(x, y)] = results_dico["dnd0_event_tot"]
-        dico_params["omega_WS"][(x, y)] = results_dico["dnd0_WS_event_tot"]
-        dico_params["omega_SW"][(x, y)] = results_dico["dnd0_SW_event_tot"]
-        dico_params["omega_SW_over_WS"][(x, y)] = results_dico["dnd0_SW_event_tot"] / results_dico["dnd0_WS_event_tot"]
-        dico_params["omega_WS_over_SW"][(x, y)] = results_dico["dnd0_WS_event_tot"] / results_dico["dnd0_SW_event_tot"]
+        for replicate_path in sorted(glob(filepath + "_*_exp")):
+            species, alignment = open_ali_file(replicate_path + ".ali")
+            for param, val in stats_from_ali(alignment).items(): dico_params[param][(x, y)].append(val)
+            results_dico = {k: v[0] for k, v in pd.read_csv(replicate_path + ".tsv", sep='\t').items()}
+            dico_params["omega"][(x, y)].append(results_dico["dnd0_event_tot"])
+            dico_params["omega_WS"][(x, y)].append(results_dico["dnd0_WS_event_tot"])
+            dico_params["omega_SW"][(x, y)].append(results_dico["dnd0_SW_event_tot"])
+            dico_params["omega_SW_over_WS"][(x, y)].append(
+                results_dico["dnd0_SW_event_tot"] / results_dico["dnd0_WS_event_tot"])
+            dico_params["omega_WS_over_SW"][(x, y)].append(
+                results_dico["dnd0_WS_event_tot"] / results_dico["dnd0_SW_event_tot"])
 
     x_range, y_range = sorted(x_range), sorted(y_range)
-    dico_params.pop("NbrSites")
-    dico_params.pop("NbrTaxa")
+    if "NbrSites" in dico_params: dico_params.pop("NbrSites")
+    if "NbrTaxa" in dico_params: dico_params.pop("NbrTaxa")
 
     for param, dico_values in dico_params.items():
         fig, ax = plt.subplots()
         for y in y_range:
             label = "$N_{\\mathrm{r}}" + "={0:.3g}".format(y) + "$"
-            ax.plot(x_range, [dico_values[(x, y)] for x in x_range], linewidth=2, label=label)
+            ax.plot(x_range, [np.mean(dico_values[(x, y)]) for x in x_range], linewidth=2, label=label)
+            ax.fill_between(x_range, [np.percentile(dico_values[(x, y)], 5) for x in x_range],
+                            [np.percentile(dico_values[(x, y)], 95) for x in x_range], alpha=0.3)
         ax.set_xscale("log")
-        ax.set_xticks([0.2, 1, 5])
-        ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
         ax.set_xlabel("$\\lambda$", size=font_size)
         ax.set_ylabel(y_label(param), size=font_size)
         ax.set_title(title(param), size=font_size * 1.2)
-        if "_aa" in param:
-            ax.set_ylim((1, 20))
-        elif ("omega" in param) and ("over" not in param):
+        if ("omega" in param) and ("over" not in param):
             ax.set_ylim((0, 1))
         elif "at_over_gc" in param:
             ax.set_yscale("log")
-            ax.set_yticks([0.2, 1, 5])
             ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
         ax.legend(loc='upper left', fontsize=legend_size)
         plt.xticks(fontsize=legend_size)
@@ -213,4 +213,4 @@ if __name__ == '__main__':
         plt.savefig("{0}/{1}.pdf".format(args.output, param), format="pdf")
         plt.savefig("{0}/{1}.png".format(args.output, param), format="png")
         plt.clf()
-    plt.close('all')
+        plt.close('all')

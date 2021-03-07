@@ -12,6 +12,7 @@
 /data
 /DataSimulated/Experiments/*
 /DataSimulated/Experiments.Legacy/
+/DataSimulated/Experiments.Rep.Legacy/
 /Data4FoldDegenerate/CDS.*.fasta
 /Data4FoldDegenerate/rootedtree.*.nhx
 /EstimatedMatrices/

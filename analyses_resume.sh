@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-for EXPERIMENT in DataSimulated/Experiments/PrimatesRep*; do
+for EXPERIMENT in DataSimulated/Experiments/*; do
   NAME=$(basename "${EXPERIMENT}")
   echo "${NAME}"
   cd ${EXPERIMENT}

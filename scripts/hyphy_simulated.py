@@ -8,7 +8,8 @@ from stat_simulated import stats_from_ali, open_fasta_file, omega_pairwise_from_
 from scipy.linalg import null_space
 
 
-def plot_pairwise_matrices(predicted, estimated, output):
+def plot_pairwise_matrices(predicted, estimated, output, estimated_list=None):
+    if estimated_list is None: estimated_list = []
     fig, axs = plt.subplots(1, 3, figsize=(16, 6))
     fig.colorbar(axs[0].imshow(predicted), ax=axs[0], orientation='horizontal', fraction=.1)
     axs[0].set_title('$\\phi$ predicted between pairs of amino-acids')
@@ -40,9 +41,15 @@ def plot_pairwise_matrices(predicted, estimated, output):
     results = model.fit()
     b, a = results.params[0:2]
     idf = np.linspace(min(x), max(x), 100)
-    axs[2].plot(idf, a * idf + b, '-',
+    axs[2].plot(idf, a * idf + b, '-', color=BLUE,
                 label=r"$y={0:.2g}x {3} {1:.2g}$ ($r^2={2:.2g})$".format(a, abs(b), results.rsquared,
                                                                          "+" if float(b) > 0 else "-"))
+
+    if estimated_list and len(estimated_list) > 5:
+        # yerr = np.array([y - np.percentile(estimated_list, 5, axis=0)[filt].flatten(), np.percentile(estimated_list, 95, axis=0)[filt].flatten() - y])
+        yerr = 1.96 * np.std(estimated_list, axis=0)[filt].flatten() / np.sqrt(len(estimated_list))
+        axs[2].errorbar(x, y, yerr=yerr, fmt='o', marker=None, mew=0, ecolor=BLUE, lw=0.5,
+                        zorder=-1)
     axs[2].set_xlabel('Predicted ($\\phi$)', fontsize=font_size)
     axs[2].set_ylabel('Estimated ($\\widehat{\\omega}$)', fontsize=font_size)
     axs[2].legend(fontsize=font_size)
@@ -62,6 +69,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    freqs = np.zeros(4) * 0.25
     if args.mutation_matrix != "False":
         df = pd.read_csv(args.mutation_matrix, sep="\t")
         nuc_matrix = np.zeros((len(nucleotides), len(nucleotides)))
@@ -77,10 +85,12 @@ if __name__ == '__main__':
         freqs /= freqs.sum()
         assert (np.sum(np.abs(np.dot(freqs, nuc_matrix))) < 1e-5)
 
-    nested_dict = nested_dict_init()
-    predicted_array, estimated_array = [], []
+    nested_dict = defaultdict(lambda: defaultdict(lambda: list()))
+    predicted_dico = {}
+    estimated_array = []
     for batch in args.input:
         at_gc_pct = float(batch.split("/")[-1].split("_")[0])
+        replicate = int(batch.split("/")[-1].split("_")[1])
 
         if args.mutation_matrix == "False":
             freqs = [(at_gc_pct if nuc in weak_nucleotides else 1.0) for nuc in nucleotides]
@@ -89,66 +99,74 @@ if __name__ == '__main__':
         exp = batch.replace(args.model + "_run.bf_hyout.txt", "exp")
         species, alignment = open_fasta_file(exp + (".ThirdPos.fasta" if args.model == "GTR" else ".fasta"))
         ali_dico = stats_from_ali(alignment)
-        nested_dict["AT/GC_obs"][at_gc_pct] = ali_dico["at_over_gc"]
+        nested_dict[at_gc_pct]["AT/GC_obs"].append(ali_dico["at_over_gc"])
 
         hyphy_dico = dico_from_file(batch)
         format_hyphy_dico(hyphy_dico, args.model)
 
         if args.model == "MF":
             profile_path = "/".join(batch.split("/")[:-1]) + "_profile.prefs"
-            predicted_array.append(omega_pairwise_from_profile(profile_path, freqs))
+            key = profile_path + str(at_gc_pct)
+            if key not in predicted_dico:
+                predicted_dico[key] = omega_pairwise_from_profile(profile_path, freqs)
             estimated_array.append(omega_pairwise_from_hyphy(hyphy_dico))
-            plot_pairwise_matrices(predicted_array[-1], estimated_array[-1],
-                                   "{0}/omega.{1}".format(args.output, at_gc_pct))
+            plot_pairwise_matrices(predicted_dico[key], estimated_array[-1],
+                                   "{0}/omega.{1}_{2}".format(args.output, at_gc_pct, replicate))
 
         results_dico = {k: v[0] for k, v in pd.read_csv(exp + ".tsv", sep='\t').items()}
-        nested_dict["w_obs"][at_gc_pct] = results_dico["dnd0_event_tot"]
+        nested_dict[at_gc_pct]["w_obs"].append(results_dico["dnd0_event_tot"])
         if args.model != "GTR":
-            nested_dict["w_inf"][at_gc_pct] = hyphy_dico["w"]
+            nested_dict[at_gc_pct]["w_inf"].append(hyphy_dico["w"])
 
         if ("pnG" in hyphy_dico) and ("pnG" in hyphy_dico):
             gc_pct = hyphy_dico["pnG"] + hyphy_dico["pnC"]
-            nested_dict["lambda_inf"][at_gc_pct] = (1 - gc_pct) / gc_pct
+            nested_dict[at_gc_pct]["lambda_inf"].append((1 - gc_pct) / gc_pct)
 
-        nested_dict["AT/GC_inf"][at_gc_pct] = equilibrium_lambda(hyphy_dico)
+        nested_dict[at_gc_pct]["AT/GC_inf"].append(equilibrium_lambda(hyphy_dico))
 
     if args.model == "MF":
+        predicted_mean = np.mean(list(predicted_dico.values()), axis=0)
         estimated_mean = np.mean(estimated_array, axis=0)
-        predicted_mean = np.mean(predicted_array, axis=0)
-        plot_pairwise_matrices(predicted_mean, estimated_mean, "{0}/mean.omega".format(args.output))
+        plot_pairwise_matrices(predicted_mean, estimated_mean, "{0}/mean.omega".format(args.output), estimated_array)
 
-    x_list = sorted(nested_dict["AT/GC_obs"].keys())
     if args.model != "GTR":
-        omega_obs = np.array([nested_dict["w_obs"][k] for k in x_list])
-        omega_inf = np.array([nested_dict["w_inf"][k] for k in x_list])
-        f = open("{0}/omega.txt".format(args.output), "w")
-        f.write("|w_obs-w_inf|/w_obs = {0:.2f}%".format(100 * np.mean(np.abs((omega_inf - omega_obs)) / omega_obs)))
+        f = open("{0}/omega.tsv".format(args.output), "w")
+        f.write("ω (precision in %)" + ("\tλ\n" if len(nested_dict) > 1 else "\n"))
+        for lambda_mut in nested_dict.keys():
+            omega_obs = np.array(nested_dict[lambda_mut]["w_obs"])
+            omega_inf = np.array(nested_dict[lambda_mut]["w_inf"])
+            f.write("{0:.2f}".format(100 * np.mean(np.abs((omega_inf - omega_obs)) / omega_obs)) + (
+                "\t{0}".format(lambda_mut) if len(nested_dict) > 1 else ""))
         f.close()
 
-    if args.mutation_matrix != "False":
-        exit(0)
+    lambda_mut = list(nested_dict.keys())
+    if len(lambda_mut) < 1: exit(0)
 
     fig, ax = plt.subplots()
-    ax.plot(x_list, x_list, color="black", linestyle='-', linewidth=2, label="y=x")
+    ax.plot(lambda_mut, lambda_mut, color="black", linestyle='-', linewidth=2, label="y=x")
 
     list_plot = list()
     list_plot.append({"experiment": "lambda_inf", "color": GREEN, "linestyle": '--', "linewidth": 4,
                       "label": "$\\widehat{\\lambda}$ inferred"})
     list_plot.append(
-        {"experiment": "AT/GC_obs", "color": BLUE, "linestyle": '-', "linewidth": 2, "label": "$AT/GC$ observed"})
+        {"experiment": "AT/GC_obs", "color": BLUE, "linestyle": '-', "linewidth": 2, "label": "$%AT/%GC$ observed"})
     # list_plot.append({"experiment": "AT/GC_inf", "color": YELLOW, "linestyle": '--', "linewidth": 4, "label": "$\\widehat{AT/GC}$ inferred"})
 
     for param in list_plot:
-        x_list = sorted(nested_dict[param["experiment"]].keys())
-        y_list = [nested_dict[param["experiment"]][k] for k in x_list]
-        ax.plot(x_list, y_list, linestyle=param["linestyle"], label=param["label"],
+        y_list = np.array([np.mean(k[param["experiment"]]) for k in nested_dict.values()])
+        ax.plot(lambda_mut, y_list, linestyle=param["linestyle"], label=param["label"],
                 color=param["color"], linewidth=param["linewidth"])
 
-    lambda_obs = np.array(x_list)
-    lambda_inf = np.array([nested_dict["lambda_inf"][k] for k in x_list])
-    f = open("{0}/lambda.txt".format(args.output), "w")
-    f.write("|lambda_obs-lambda_inf|/lambda_obs = {0:.2f}%".format(
-        100 * np.mean(np.abs((lambda_inf - lambda_obs)) / lambda_obs)))
+        reps_set_len = set([len(k[param["experiment"]]) for k in nested_dict.values()])
+        assert (len(reps_set_len) == 1)
+        if reps_set_len.pop() > 5:
+            lower = [np.percentile(k[param["experiment"]], 5) for k in nested_dict.values()]
+            upper = [np.percentile(k[param["experiment"]], 95) for k in nested_dict.values()]
+            ax.fill_between(lambda_mut, lower, upper, alpha=0.3, color=param["color"], facecolor=param["color"])
+
+    lambda_inf = np.array([np.mean(k["lambda_inf"]) for k in nested_dict.values()])
+    f = open("{0}/lambda.tsv".format(args.output), "w")
+    f.write("λ (precision in %)\n{0:.2f}%".format(100 * np.mean(np.abs((lambda_inf - lambda_mut)) / lambda_mut)))
     f.close()
     ax.set_xscale('log')
     ax.set_xlabel('$\\lambda$ used for the simulation', fontsize=font_size)
@@ -156,7 +174,8 @@ if __name__ == '__main__':
     ax.set_ylabel('$\\lambda$ estimated', fontsize=font_size)
     ax.get_xaxis().get_major_formatter().labelOnlyBase = False
     ax.legend(fontsize=font_size)
-    model_name = {"GTR": "General time-reversible (GTR) on third positions", "MG": "Muse & Gaut codon model", "MF": "Mean-field codon model"}
+    model_name = {"GTR": "General time-reversible (GTR) on third positions", "MG": "Muse & Gaut codon model",
+                  "MF": "Mean-field codon model"}
     ax.set_title(model_name[args.model], fontsize=font_size)
     ax.set_xticks([0.2, 1, 5])
     ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())

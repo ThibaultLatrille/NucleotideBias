@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-for EXPERIMENT in ./DataSimulated/Experiments/PrimatesNucBiasExons10Mu*; do
+for EXPERIMENT in ./DataSimulated/Experiments/PrimatesSimulations*; do
   NAME=$(basename "${EXPERIMENT}")
   echo "${NAME}"
   rm -rf ${EXPERIMENT}/Snakefile

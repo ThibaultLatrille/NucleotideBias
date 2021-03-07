@@ -35,7 +35,7 @@ SIMULATION_PARAMS += ' --fix_mut_rate'
 SIMULATION_PARAMS += ' --fix_gen_time'
 
 if MUTATION_MATRIX:
-    mut_bias_array = ["None"]
+    mut_bias_array = [1]
 else:
     mut_bias_array = ["{0:3f}".format(i) for i in np.logspace(np.log10(config['LAMBDA_ARRAY_MIN']), np.log10(config['LAMBDA_ARRAY_MAX']), config['LAMBDA_ARRAY_STEPS'])]
 
@@ -90,7 +90,7 @@ rule run_simulation:
          matrix=MUTATION_MATRIX if MUTATION_MATRIX else rules.generate_matrix.output
     params:
          time="0-4:00", mem=1000, threads=1,
-         seed=lambda w: int(w.mut_bias) * 10**3 if MUTATION_MATRIX else SEED
+         seed=lambda w: int(w.replicates) * 10**3
     benchmark: EXPERIMENT + "/benchmarks/exp_{alpha}_{mut_bias}_{replicates}.tsv"
     log:
         out=EXPERIMENT + '/std/exp_{alpha}_{mut_bias}_{replicates}.stdout',
@@ -102,7 +102,9 @@ rule plot_simulations:
     input:
          src=ROOT + "/scripts/stat_simulated.py",
          exp=expand(rules.run_simulation.output, alpha=alpha_array, mut_bias=mut_bias_array, replicates=replicates_array)
-    shell: 'mkdir -p {output} && python3 {input.src} --input {input.exp} --output {output}'
+    params:
+         exp=lambda w: expand(EXPERIMENT + '/{alpha}/{mut_bias}', alpha=alpha_array, mut_bias=mut_bias_array)
+    shell: 'mkdir -p {output} && python3 {input.src} --input {params.exp} --output {output}'
 
 rule simulation:
     input: EXPERIMENT + '/plot_simulation'
