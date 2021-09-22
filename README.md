@@ -17,18 +17,11 @@ cd NucleotideBias
 ## 1. Installation
 
 ### Installation on debian
-Install the compiling toolchains:
-```
-sudo apt install -qq -y make cmake clang
-```
-Clone and compile the C++ code for *SimuEvol*
-```
-git clone https://github.com/ThibaultLatrille/SimuEvol && cd SimuEvol && make release && cd ..
-```
+
 Install python3 packages
 ```
 sudo apt install -qq -y python3-dev python3-pip
-pip3 install jinja2 jupyterlab snakemake numpy matplotlib pandas ete3 statsmodels --user
+pip3 install jinja2 snakemake numpy matplotlib pandas ete3 statsmodels --user
 ```
 Install Hyphy from http://hyphy.org/installation/ using `miniconda`
 ```
@@ -37,26 +30,20 @@ sh Miniconda3-latest-Linux-x86_64.sh
 conda config --add channels bioconda
 conda install -c bioconda hyphy
 ```
-## 2. Run experiments
+## 2. Replicate experiments
 
-### Installation on debian
-In both folder `DataEmpirical` and `DataSimulated`, run `snakemake`:
-```
-cd DataSimulated
-snakemake
-```
+To replicate figure 1, 2 and 3 of the manuscript on simulated dataset, the sub-folder [*DataSimulated*](https://github.com/ThibaultLatrille/NucleotideBias/tree/master/DataSimulated) contains a [README.md](https://github.com/ThibaultLatrille/NucleotideBias/tree/master/DataSimulated/README.md) with the necessary instructions.
 
-## 3. Add features or debug in the python scripts
+To replicate table 1 of the manuscript on empirical sequence data, the sub-folder [*DataEmpirical*](https://github.com/ThibaultLatrille/NucleotideBias/tree/master/DataEmpirical) contains a [README.md](https://github.com/ThibaultLatrille/NucleotideBias/tree/master/DataEmpirical/README.md) with the necessary instructions.
+
+## 3. Run your own experiments
+
+Instructions can be found the sub-folder [*DataEmpirical*](https://github.com/ThibaultLatrille/NucleotideBias/tree/master/DataEmpirical).
+
+## 4. Add features or debug in the python scripts
 You made modifications to one of the python script, a notebook, this README.md, or you added new features.
 You wish this work benefits to all (futur) users of this repository?
 Please, feel free to open a [pull-request](https://github.com/ThibaultLatrille/NucleotideBias/pulls)
-
-## 4. Add features or debug in *SimuEvol*
-You made modifications to the C++ code of the simulation framework *SimuEvol*.
-You wish this changes benefit to all users of these software?
-
-Please, feel free to open pull-requests in the respective GitHub repository:
-* https://github.com/ThibaultLatrille/SimuEvol 
 
 ## Licence
 
