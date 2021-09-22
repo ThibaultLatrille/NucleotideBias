@@ -48,5 +48,5 @@ if __name__ == '__main__':
 
     filt_fasta = open(args.output, 'w')
     for id_sp, sp in enumerate(species):
-        filt_fasta.write(">{0}\n{1}\n".format(sp, "".join(filtered_sites[id_sp, :]).replace('?', '-')))
+        filt_fasta.write(">{0}\n{1}\n".format(sp.strip(), "".join(filtered_sites[id_sp, :]).replace('?', '-')))
     filt_fasta.close()

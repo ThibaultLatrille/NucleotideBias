@@ -123,20 +123,24 @@ def stats_from_ali(alignment):
 
 
 def y_label(p):
+    lhs = "\\left\\langle 2 N_{\\mathrm{e}} \\mathbb{P}_{\\mathrm{fix}} "
+    rhs = " \\right\\rangle "
+    WS = "^{\\mathrm{WS}}"
+    SW = "^{\\mathrm{SW}}"
     if "at_over_gc" in p:
-        return '%AT/%GC'
+        return 'AT/GC'
     elif "diversity" in p:
         return "D"
     elif "omega_WS_over_SW" in p:
-        return "$\\phi_{\\mathrm{AT} \\rightarrow \\mathrm{GC}} / \\phi_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
+        return "$\\frac{" + lhs + WS + rhs + " }{" + lhs + SW + rhs + "}$"
     elif "omega_SW_over_WS" in p:
-        return "$\\phi_{\\mathrm{GC} \\rightarrow \\mathrm{AT}} / \\phi_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
+        return "$\\frac{" + lhs + SW + rhs + " }{" + lhs + WS + rhs + "}$"
     elif "omega_WS" in p:
-        return "$\\phi_{\\mathrm{AT} \\rightarrow \\mathrm{GC}}$"
+        return "${0}$".format(lhs + WS + rhs)
     elif "omega_SW" in p:
-        return "$\\phi_{\\mathrm{GC} \\rightarrow \\mathrm{AT}}$"
+        return "${0}$".format(lhs + SW + rhs)
     elif "omega" in p:
-        return "$\\phi$"
+        return "${0}$".format(lhs + rhs)
     else:
         return p
 
@@ -197,7 +201,7 @@ if __name__ == '__main__':
             ax.fill_between(x_range, [np.percentile(dico_values[(x, y)], 5) for x in x_range],
                             [np.percentile(dico_values[(x, y)], 95) for x in x_range], alpha=0.3)
         ax.set_xscale("log")
-        ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
         ax.set_xlabel("$\\lambda$", size=font_size)
         ax.set_ylabel(y_label(param), size=font_size)
         ax.set_title(title(param), size=font_size * 1.2)
@@ -206,7 +210,7 @@ if __name__ == '__main__':
         elif "at_over_gc" in param:
             ax.set_yscale("log")
             ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-        ax.legend(loc='upper left', fontsize=legend_size)
+        ax.legend(loc="upper center", fontsize=legend_size)
         plt.xticks(fontsize=legend_size)
         plt.yticks(fontsize=legend_size)
         plt.tight_layout()

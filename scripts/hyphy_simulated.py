@@ -11,10 +11,13 @@ from scipy.linalg import null_space
 def plot_pairwise_matrices(predicted, estimated, output, estimated_list=None):
     if estimated_list is None: estimated_list = []
     fig, axs = plt.subplots(1, 3, figsize=(16, 6))
-    fig.colorbar(axs[0].imshow(predicted), ax=axs[0], orientation='horizontal', fraction=.1)
-    axs[0].set_title('$\\phi$ predicted between pairs of amino-acids')
-    fig.colorbar(axs[1].imshow(estimated), ax=axs[1], orientation='horizontal', fraction=.1)
-    axs[1].set_title('$\\widehat{\\omega}$ estimated between pairs of amino-acids')
+    cbar = fig.colorbar(axs[0].imshow(predicted), ax=axs[0], orientation='horizontal', fraction=.05)
+    cbar.ax.tick_params(labelsize=font_size)
+    axs[0].set_title('$\\left\\langle 2 N_{\\mathrm{e}} \\mathbb{P}_{\\mathrm{fix}} \\right\\rangle $ '
+                     'predicted between\npairs of amino-acids', fontsize=font_size * 1.2)
+    cbar = fig.colorbar(axs[1].imshow(estimated), ax=axs[1], orientation='horizontal', fraction=.05)
+    cbar.ax.tick_params(labelsize=font_size)
+    axs[1].set_title('$\\widehat{\\omega}$ estimated between\npairs of amino-acids', fontsize=font_size * 1.2)
 
     for index in [0, 1]:
         # We want to show all ticks...
@@ -35,7 +38,7 @@ def plot_pairwise_matrices(predicted, estimated, output, estimated_list=None):
     x = predicted[filt].flatten()
     y = estimated[filt].flatten()
     axs[2].scatter(x, y)
-    axs[2].set_title('Fixation probabilities', fontsize=font_size)
+    axs[2].set_title('Fixation probabilities', fontsize=font_size * 1.2)
 
     model = sm.OLS(y, sm.add_constant(x))
     results = model.fit()
@@ -50,9 +53,10 @@ def plot_pairwise_matrices(predicted, estimated, output, estimated_list=None):
         yerr = 1.96 * np.std(estimated_list, axis=0)[filt].flatten() / np.sqrt(len(estimated_list))
         axs[2].errorbar(x, y, yerr=yerr, fmt='o', marker=None, mew=0, ecolor=BLUE, lw=0.5,
                         zorder=-1)
-    axs[2].set_xlabel('Predicted ($\\phi$)', fontsize=font_size)
-    axs[2].set_ylabel('Estimated ($\\widehat{\\omega}$)', fontsize=font_size)
-    axs[2].legend(fontsize=font_size)
+    axs[2].set_xlabel('Predicted $\\left\\langle 2 N_{\\mathrm{e}} \\mathbb{P}_{\\mathrm{fix}} \\right\\rangle $',
+                      fontsize=font_size * 1.2)
+    axs[2].set_ylabel('Estimated $\\widehat{\\omega}$', fontsize=font_size * 1.2)
+    axs[2].legend(fontsize=font_size * 0.8, loc="lower right")
     fig.tight_layout()
     plt.savefig(output + ".pdf", format="pdf")
     plt.savefig(output + ".png", format="png")
@@ -149,8 +153,8 @@ if __name__ == '__main__':
     list_plot.append({"experiment": "lambda_inf", "color": GREEN, "linestyle": '--', "linewidth": 4,
                       "label": "$\\widehat{\\lambda}$ inferred"})
     list_plot.append(
-        {"experiment": "AT/GC_obs", "color": BLUE, "linestyle": '-', "linewidth": 2, "label": "$%AT/%GC$ observed"})
-    # list_plot.append({"experiment": "AT/GC_inf", "color": YELLOW, "linestyle": '--', "linewidth": 4, "label": "$\\widehat{AT/GC}$ inferred"})
+        {"experiment": "AT/GC_obs", "color": BLUE, "linestyle": '-', "linewidth": 2, "label": "AT/GC observed"})
+    list_plot.append({"experiment": "AT/GC_inf", "color": YELLOW, "linestyle": '--', "linewidth": 4, "label": "$\\widehat{AT/GC}$ predicted"})
 
     for param in list_plot:
         y_list = np.array([np.mean(k[param["experiment"]]) for k in nested_dict.values()])
@@ -173,7 +177,7 @@ if __name__ == '__main__':
     ax.set_yscale('log')
     ax.set_ylabel('$\\lambda$ estimated', fontsize=font_size)
     ax.get_xaxis().get_major_formatter().labelOnlyBase = False
-    ax.legend(fontsize=font_size)
+    ax.legend(fontsize=font_size, loc="lower right")
     model_name = {"GTR": "General time-reversible (GTR) on third positions", "MG": "Muse & Gaut codon model",
                   "MF": "Mean-field codon model"}
     ax.set_title(model_name[args.model], fontsize=font_size)
