@@ -7,7 +7,7 @@ BATCH_PATH = "{0}/scripts/hyphy_template.bf".format(ROOT)
 from scripts.snakemake_module import *
 
 EXPERIMENT = os.path.abspath('.')
-experiment_array = [i for i in os.listdir(os.path.abspath('.')) if (os.path.isdir(i) and os.path.isfile(i + "/tree.newick"))]
+experiment_array = [i for i in os.listdir(os.path.abspath('.')) if (os.path.isdir(i) and os.path.isfile(i + "/tree.newick") and os.path.isfile(i + "/alignment.fasta") )]
 print(experiment_array)
 models = ["MG", "MF", "GTR"]
 
