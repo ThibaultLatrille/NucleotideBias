@@ -13,6 +13,7 @@ Second, we set up the hyphy batch file which makes use of these frequencies.
 Third, we generate the MG1 and MG3 matrix files.
 '''
 from codons import *
+from stat_simulated import open_fasta_file
 import jinja2
 import argparse
 from ete3 import Tree
@@ -26,6 +27,16 @@ def write_fasta_file(ali_path, fasta_path):
                 if line == "\n": continue
                 name, seq = line.replace("  ", " ").split(" ")
                 fasta_file.write(">{0}\n{1}".format(name, seq))
+
+
+def build_nuc_freq_empirical(fasta_path, n_freqs):
+    species_list, ali_list = open_fasta_file(fasta_path)
+    nbr_sites = sum([len(s) for s in ali_list])
+    output_dict = {}
+    for n in n_freqs.keys():
+        output_dict[n] = sum([s.count(n) for s in ali_list]) / nbr_sites
+
+    return output_dict
 
 
 def get_nuc_diff(source, target, grab_position=False):
@@ -51,7 +62,7 @@ def array_to_hyphy_freq(f):
     return hyphy_f
 
 
-def build_nuc_freq_constrains(nuc_freqs, vars_list, constrains_list):
+def build_nuc_freq_constrains(nuc_freqs, vars_list, constrains_list, empirical_freqs):
     ''' Compute codon frequencies from GTR nucleotide frequencies. '''
     const_freq = nuc_freqs['T']
     values_set = set(nuc_freqs.values())
@@ -59,10 +70,12 @@ def build_nuc_freq_constrains(nuc_freqs, vars_list, constrains_list):
     const_freq_sum = "+".join([var for var in values_set if var != const_freq])
     ratio = len(values_set) / len(nuc_freqs.values())
 
-    for var in values_set:
-        if var != const_freq:
-            vars_list.append("global {0}=0.25;".format(var))
+    values_set.remove(const_freq)
+    for nuc, var in nuc_freqs.items():
+        if var in values_set:
+            vars_list.append("global {0}={1:.2f};".format(var, empirical_freqs[nuc]))
             constrains_list.append("{0}:>0;".format(var))
+            values_set.remove(var)
 
     constrains_list.append("global {0}:={1}-({2});".format(const_freq, ratio, const_freq_sum))
     constrains_list.append("{0}:>0;".format(const_freq))
@@ -187,7 +200,7 @@ def build_codon_matrices(nuc_freqs, exchan_vars, omega_param, vars_list, constra
         constrains_list.extend(["{0}:>0;".format(v) for v in epsilon_set])
         constrains_list.extend(["{0}:<20;".format(v) for v in epsilon_set])
 
-    vars_list.extend(["global {0}=1.0;".format(v) for v in omega_set])
+    vars_list.extend(["global {0}=0.3;".format(v) for v in omega_set])
     constrains_list.extend(["{0}:>0;".format(v) for v in omega_set])
     constrains_list.extend(["{0}:<10;".format(v) for v in omega_set])
 
@@ -214,7 +227,9 @@ def build_hyphy_batchfile(batch_outfile, raw_batchfile, fasta_infile, tree_infil
     vars_list, constrains_list = [], []
 
     nuc_freqs = nuc_freqs_dict[freq_param]
-    build_nuc_freq_constrains(nuc_freqs, vars_list, constrains_list)
+
+    empirical_freqs = build_nuc_freq_empirical(fasta_infile, nuc_freqs)
+    build_nuc_freq_constrains(nuc_freqs, vars_list, constrains_list, empirical_freqs)
     exchan_vars = build_nuc_rates(rate_param, vars_list, constrains_list, nuc_freqs)
 
     if omega_param == 0:

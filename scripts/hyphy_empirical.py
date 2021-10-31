@@ -19,7 +19,8 @@ if __name__ == '__main__':
         hyphy_dico = dico_from_file(hyphy_result)
         format_hyphy_dico(hyphy_dico, model)
 
-        out_dico["lambda_obs_" + model] = equilibrium_lambda(hyphy_dico)
+        out_dico["lambda_obs_" + model], out_dico["lambda_obs_1" + model], out_dico["lambda_obs_2" + model], out_dico[
+            "lambda_obs_3" + model] = equilibrium_lambda(hyphy_dico)
         if ("pnG" in hyphy_dico) and ("pnG" in hyphy_dico):
             gc_pct = (hyphy_dico["pnG"] + hyphy_dico["pnC"])
             out_dico["lambda_" + model] = (1.0 - gc_pct) / gc_pct

@@ -104,7 +104,8 @@ def stats_from_ali(alignment):
     nbr_sites = len(alignment[0])
     out_dico["NbrSites"] = nbr_sites
     out_dico["NbrTaxa"] = len(alignment)
-    if nbr_sites % 3 != 0: return out_dico
+    if nbr_sites % 3 != 0:
+        return out_dico
     for pos in range(0, 3):
         count = Counter(concat[pos::3])
         out_dico["at_over_gc_{0}".format(pos + 1)] = (count["A"] + count["T"]) / (count["C"] + count["G"])

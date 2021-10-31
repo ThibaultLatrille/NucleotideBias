@@ -8,9 +8,9 @@ from ete3 import Tree
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-f', '--ali_folder', required=False, default='OrthoMam/singlegene_alignments', type=str, dest="ali_folder")
-    parser.add_argument('-i', '--input', required=False, default='OrthoMam/AT_GC.tsv', type=str, dest="input")
+    parser.add_argument('-i', '--input', required=False, default='OrthoMam/AT_GC_4F.tsv', type=str, dest="input")
     parser.add_argument('-t', '--tree', required=False, default="OrthoMam/rootedtree.nhx", type=str, dest="tree")
-    parser.add_argument('-o', '--output', required=False, default='DataEmpirical/OrthoMamPrimatesHighGC/', type=str,
+    parser.add_argument('-o', '--output', required=False, default='DataEmpirical/OrthoMamPrimatesHighGC-4F/', type=str,
                         dest="output")
     parser.add_argument('-a', '--ancestral', required=False, default="GOPMCNPPHGRPCCMPMCSCCA", type=str, dest="ancestral")
     parser.add_argument('-s', '--nbr_sites', required=False, default=15000, type=int, dest="nbr_sites")

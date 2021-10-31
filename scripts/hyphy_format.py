@@ -92,12 +92,16 @@ def format_hyphy_dico(hyphy_dico, model):
 
 
 def equilibrium_lambda(hyphy_dico):
-    at_pct = equilibrium_at_pct(hyphy_dico)
-    return at_pct / (1 - at_pct)
+    at_pct_tot, at_pct_1, at_pct_2, at_pct_3 = equilibrium_at_pct(hyphy_dico)
+    return at_pct_tot / (1 - at_pct_tot), at_pct_1 / (1 - at_pct_1), at_pct_2 / (1 - at_pct_2), at_pct_3 / (
+                1 - at_pct_3)
 
 
 def equilibrium_at_pct(hyphy_dico):
-    nbr_weak = np.array([c.count("A") + c.count("T") for c in codons])
+    nbr_weak_tot = np.array([c.count("A") + c.count("T") for c in codons])
+    nbr_weak_1 = np.array([c[0].count("A") + c[0].count("T") for c in codons])
+    nbr_weak_2 = np.array([c[1].count("A") + c[1].count("T") for c in codons])
+    nbr_weak_3 = np.array([c[2].count("A") + c[2].count("T") for c in codons])
     codon_frequencies = np.ones(len(codons))
 
     for index, codon in enumerate(codons):
@@ -109,7 +113,8 @@ def equilibrium_at_pct(hyphy_dico):
 
     codon_frequencies /= np.sum(codon_frequencies)
 
-    return np.sum(codon_frequencies * nbr_weak) / 3
+    return np.sum(codon_frequencies * nbr_weak_tot) / 3, np.sum(codon_frequencies * nbr_weak_1), np.sum(
+        codon_frequencies * nbr_weak_2), np.sum(codon_frequencies * nbr_weak_3)
 
 
 def omega_pairwise_from_hyphy(hyphy_dico):

@@ -13,11 +13,11 @@ def plot_pairwise_matrices(predicted, estimated, output, estimated_list=None):
     fig, axs = plt.subplots(1, 3, figsize=(16, 6))
     cbar = fig.colorbar(axs[0].imshow(predicted), ax=axs[0], orientation='horizontal', fraction=.05)
     cbar.ax.tick_params(labelsize=font_size)
-    axs[0].set_title('$\\left\\langle 2 N_{\\mathrm{e}} \\mathbb{P}_{\\mathrm{fix}} \\right\\rangle $ '
+    axs[0].set_title('$\\left\\langle 2 N_{\\mathrm{e}} \\mathbb{P}_{\\mathrm{fix}} (x \\to y) \\right\\rangle $ '
                      'predicted between\npairs of amino-acids', fontsize=font_size * 1.2)
     cbar = fig.colorbar(axs[1].imshow(estimated), ax=axs[1], orientation='horizontal', fraction=.05)
     cbar.ax.tick_params(labelsize=font_size)
-    axs[1].set_title('$\\widehat{\\omega}$ estimated between\npairs of amino-acids', fontsize=font_size * 1.2)
+    axs[1].set_title('$\\widehat{\\omega}_{x,y}$ estimated between\npairs of amino-acids', fontsize=font_size * 1.2)
 
     for index in [0, 1]:
         # We want to show all ticks...
@@ -53,15 +53,61 @@ def plot_pairwise_matrices(predicted, estimated, output, estimated_list=None):
         yerr = 1.96 * np.std(estimated_list, axis=0)[filt].flatten() / np.sqrt(len(estimated_list))
         axs[2].errorbar(x, y, yerr=yerr, fmt='o', marker=None, mew=0, ecolor=BLUE, lw=0.5,
                         zorder=-1)
-    axs[2].set_xlabel('Predicted $\\left\\langle 2 N_{\\mathrm{e}} \\mathbb{P}_{\\mathrm{fix}} \\right\\rangle $',
+    axs[2].set_xlabel('True $\\left\\langle 2 N_{\\mathrm{e}} \\mathbb{P}_{\\mathrm{fix}} (x \\to y) \\right\\rangle $',
                       fontsize=font_size * 1.2)
-    axs[2].set_ylabel('Estimated $\\widehat{\\omega}$', fontsize=font_size * 1.2)
+    axs[2].set_ylabel('Estimated $\\widehat{\\omega}_{x,y}$', fontsize=font_size * 1.2)
     axs[2].legend(fontsize=font_size * 0.8, loc="lower right")
     fig.tight_layout()
     plt.savefig(output + ".pdf", format="pdf")
     plt.savefig(output + ".png", format="png")
     plt.clf()
     plt.close('all')
+
+
+def plot_scaling(list_plot, outname, ylabel, plot_id=True, yscale="log", loc="lower right", legend_fontsize=14):
+    fig, ax = plt.subplots()
+    if plot_id:
+        ax.plot(lambda_mut, lambda_mut, color="black", linestyle='-', linewidth=2, label="y=x")
+
+    for param in list_plot:
+        y_list = np.array([np.mean(k[param["experiment"]]) for k in nested_dict.values()])
+        ax.plot(lambda_mut, y_list, linestyle=param["linestyle"], label=param["label"],
+                color=param["color"], linewidth=param["linewidth"])
+
+        reps_set_len = set([len(k[param["experiment"]]) for k in nested_dict.values()])
+        assert (len(reps_set_len) == 1)
+        reps_len = reps_set_len.pop()
+        if reps_len > 2:
+            std = np.array([np.std(k[param["experiment"]]) for k in nested_dict.values()])
+            yerr = 1.96 * std / np.sqrt(reps_len)
+            lower = y_list - yerr
+            upper = y_list + yerr
+            ax.fill_between(lambda_mut, lower, upper, alpha=0.3, color=param["color"], facecolor=param["color"])
+
+    lambda_inf = np.array([np.mean(k["lambda_inf"]) for k in nested_dict.values()])
+    out_file = open("{0}/{1}.tsv".format(args.output, outname), "w")
+    out_file.write("λ (precision in %)\n{0:.2f}%".format(100 * np.mean(np.abs((lambda_inf - lambda_mut)) / lambda_mut)))
+    out_file.close()
+    ax.set_xscale('log')
+    ax.set_xlabel('$\\lambda$ used for the simulation', fontsize=font_size)
+    ax.set_yscale(yscale)
+    ax.set_ylabel(ylabel, fontsize=font_size)
+    ax.get_xaxis().get_major_formatter().labelOnlyBase = False
+    ax.legend(fontsize=legend_fontsize, loc=loc)
+    model_name = {"GTR": "General time-reversible (GTR) on third positions", "MG": "Muse & Gaut codon model",
+                  "MF": "Mean-field codon model"}
+    ax.set_title(model_name[args.model], fontsize=font_size)
+    ax.set_xticks([0.2, 1, 5])
+    ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    if yscale == "log":
+        ax.set_yticks([0.2, 1, 5])
+        ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    plt.xticks(fontsize=legend_size)
+    plt.yticks(fontsize=legend_size)
+    plt.tight_layout()
+    plt.savefig("{0}/{1}.pdf".format(args.output, outname), format="pdf")
+    plt.savefig("{0}/{1}.png".format(args.output, outname), format="png")
+    plt.clf()
 
 
 if __name__ == '__main__':
@@ -104,6 +150,10 @@ if __name__ == '__main__':
         species, alignment = open_fasta_file(exp + (".ThirdPos.fasta" if args.model == "GTR" else ".fasta"))
         ali_dico = stats_from_ali(alignment)
         nested_dict[at_gc_pct]["AT/GC_obs"].append(ali_dico["at_over_gc"])
+        if args.model != "GTR":
+            nested_dict[at_gc_pct]["AT/GC_1_obs"].append(ali_dico["at_over_gc_1"])
+            nested_dict[at_gc_pct]["AT/GC_2_obs"].append(ali_dico["at_over_gc_2"])
+            nested_dict[at_gc_pct]["AT/GC_3_obs"].append(ali_dico["at_over_gc_3"])
 
         hyphy_dico = dico_from_file(batch)
         format_hyphy_dico(hyphy_dico, args.model)
@@ -114,8 +164,7 @@ if __name__ == '__main__':
             if key not in predicted_dico:
                 predicted_dico[key] = omega_pairwise_from_profile(profile_path, freqs)
             estimated_array.append(omega_pairwise_from_hyphy(hyphy_dico))
-            plot_pairwise_matrices(predicted_dico[key], estimated_array[-1],
-                                   "{0}/omega.{1}_{2}".format(args.output, at_gc_pct, replicate))
+            # plot_pairwise_matrices(predicted_dico[key], estimated_array[-1], "{0}/omega.{1}_{2}".format(args.output, at_gc_pct, replicate))
 
         results_dico = {k: v[0] for k, v in pd.read_csv(exp + ".tsv", sep='\t').items()}
         nested_dict[at_gc_pct]["w_obs"].append(results_dico["dnd0_event_tot"])
@@ -126,7 +175,11 @@ if __name__ == '__main__':
             gc_pct = hyphy_dico["pnG"] + hyphy_dico["pnC"]
             nested_dict[at_gc_pct]["lambda_inf"].append((1 - gc_pct) / gc_pct)
 
-        nested_dict[at_gc_pct]["AT/GC_inf"].append(equilibrium_lambda(hyphy_dico))
+        atgc_tot, atgc_1, atgc_2, atgc_3 = equilibrium_lambda(hyphy_dico)
+        nested_dict[at_gc_pct]["AT/GC_inf"].append(atgc_tot)
+        nested_dict[at_gc_pct]["AT/GC_1_inf"].append(atgc_1)
+        nested_dict[at_gc_pct]["AT/GC_2_inf"].append(atgc_2)
+        nested_dict[at_gc_pct]["AT/GC_3_inf"].append(atgc_3)
 
     if args.model == "MF":
         predicted_mean = np.mean(list(predicted_dico.values()), axis=0)
@@ -144,51 +197,46 @@ if __name__ == '__main__':
         f.close()
 
     lambda_mut = list(nested_dict.keys())
-    if len(lambda_mut) < 1: exit(0)
+    if len(lambda_mut) < 1:
+        exit(0)
 
-    fig, ax = plt.subplots()
-    ax.plot(lambda_mut, lambda_mut, color="black", linestyle='-', linewidth=2, label="y=x")
-
-    list_plot = list()
-    list_plot.append({"experiment": "lambda_inf", "color": GREEN, "linestyle": '--', "linewidth": 4,
-                      "label": "$\\widehat{\\lambda}$ inferred"})
-    list_plot.append(
+    list_plots = list()
+    list_plots.append(
         {"experiment": "AT/GC_obs", "color": BLUE, "linestyle": '-', "linewidth": 2, "label": "AT/GC observed"})
-    list_plot.append({"experiment": "AT/GC_inf", "color": YELLOW, "linestyle": '--', "linewidth": 4, "label": "$\\widehat{AT/GC}$ predicted"})
+    list_plots.append({"experiment": "lambda_inf", "color": GREEN, "linestyle": '--', "linewidth": 2,
+                       "label": "$\\widehat{\\lambda}$ inferred"})
+    list_plots.append({"experiment": "AT/GC_inf", "color": YELLOW, "linestyle": '--', "linewidth": 2,
+                       "label": "AT/GC predicted"})
+    plot_scaling(list_plots, "lambda", '$\\lambda$ estimated')
 
-    for param in list_plot:
-        y_list = np.array([np.mean(k[param["experiment"]]) for k in nested_dict.values()])
-        ax.plot(lambda_mut, y_list, linestyle=param["linestyle"], label=param["label"],
-                color=param["color"], linewidth=param["linewidth"])
+    if args.model == "GTR":
+        exit(0)
 
-        reps_set_len = set([len(k[param["experiment"]]) for k in nested_dict.values()])
-        assert (len(reps_set_len) == 1)
-        if reps_set_len.pop() > 5:
-            lower = [np.percentile(k[param["experiment"]], 5) for k in nested_dict.values()]
-            upper = [np.percentile(k[param["experiment"]], 95) for k in nested_dict.values()]
-            ax.fill_between(lambda_mut, lower, upper, alpha=0.3, color=param["color"], facecolor=param["color"])
+    list_plots = list()
+    list_plots.append({"experiment": "AT/GC_1_obs", "color": BLUE, "linestyle": '-', "linewidth": 2,
+                      "label": "AT/GC observed"})
+    list_plots.append({"experiment": "AT/GC_1_inf", "color": YELLOW, "linestyle": '--', "linewidth": 3,
+                       "label": "AT/GC predicted"})
+    plot_scaling(list_plots, "obs_atgc_1", "AT/GC at first position")
 
-    lambda_inf = np.array([np.mean(k["lambda_inf"]) for k in nested_dict.values()])
-    f = open("{0}/lambda.tsv".format(args.output), "w")
-    f.write("λ (precision in %)\n{0:.2f}%".format(100 * np.mean(np.abs((lambda_inf - lambda_mut)) / lambda_mut)))
-    f.close()
-    ax.set_xscale('log')
-    ax.set_xlabel('$\\lambda$ used for the simulation', fontsize=font_size)
-    ax.set_yscale('log')
-    ax.set_ylabel('$\\lambda$ estimated', fontsize=font_size)
-    ax.get_xaxis().get_major_formatter().labelOnlyBase = False
-    ax.legend(fontsize=font_size, loc="lower right")
-    model_name = {"GTR": "General time-reversible (GTR) on third positions", "MG": "Muse & Gaut codon model",
-                  "MF": "Mean-field codon model"}
-    ax.set_title(model_name[args.model], fontsize=font_size)
-    ax.set_xticks([0.2, 1, 5])
-    ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    ax.set_yticks([0.2, 1, 5])
-    ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    plt.xticks(fontsize=legend_size)
-    plt.yticks(fontsize=legend_size)
-    plt.tight_layout()
-    plt.savefig("{0}/lambda.pdf".format(args.output), format="pdf")
-    plt.savefig("{0}/lambda.png".format(args.output), format="png")
-    plt.clf()
-    plt.close('all')
+    list_plots = list()
+    list_plots.append({"experiment": "AT/GC_2_obs", "color": BLUE, "linestyle": '-', "linewidth": 2,
+                       "label": "AT/GC observed"})
+    list_plots.append({"experiment": "AT/GC_2_inf", "color": YELLOW, "linestyle": '--', "linewidth": 3,
+                       "label": "AT/GC predicted"})
+    plot_scaling(list_plots, "obs_atgc_2", "AT/GC at second position")
+
+    list_plots = list()
+    list_plots.append({"experiment": "AT/GC_3_obs", "color": BLUE, "linestyle": '-', "linewidth": 2,
+                       "label": "AT/GC observed"})
+    list_plots.append({"experiment": "AT/GC_3_inf", "color": YELLOW, "linestyle": '--', "linewidth": 2,
+                       "label": "AT/GC predicted"})
+    plot_scaling(list_plots, "obs_atgc_3", "AT/GC at third position")
+
+    list_plots = list()
+    list_plots.append(
+        {"experiment": "w_obs", "color": BLUE, "linestyle": '-', "linewidth": 2, "label": "$\\omega$ of simulation"})
+    list_plots.append({"experiment": "w_inf", "color": GREEN, "linestyle": '--', "linewidth": 2,
+                       "label": "$\\widehat{\\omega}$ inferred"})
+    plot_scaling(list_plots, "omega", '$\\omega$', plot_id=False, yscale="linear", loc="upper right")
+
