@@ -1,5 +1,9 @@
-# Nucleotide Bias
+**An improved codon modeling approach for accurate estimation of the mutation bias,**\
+Thibault Latrille, Nicolas Lartillot,\
+*Molecular Biology and Evolution*, Volume 39, Issue 2, February 2022, msac005,\
+https://doi.org/10.1093/molbev/msac005
 
+--- 
 This repository is meant to provide the necessary scripts and data to reproduce the figures shown in the manuscript.
 The experiments can either run on a local computer or in a cluster configuration (slurm).
 
